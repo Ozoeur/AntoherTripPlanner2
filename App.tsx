@@ -7,6 +7,7 @@ import AutocompleteInput from './components/AutocompleteInput';
 import { generateItinerary, generateAlternative, getPlaceDetails } from './services/geminiService';
 import { MapIcon, ListIcon, SaveIcon, FolderIcon, AlertTriangleIcon, HistoryIcon } from './components/Icons';
 import VisitedPlaces from './components/VisitedPlaces';
+import BottomNavBar from './components/BottomNavBar';
 
 const App: React.FC = () => {
     const [city, setCity] = useState<string>('');
@@ -24,6 +25,7 @@ const App: React.FC = () => {
     const [completedActivities, setCompletedActivities] = useState<{ [city: string]: string[] }>({});
     const [replacingItemId, setReplacingItemId] = useState<string | null>(null);
     const [isAddingVisited, setIsAddingVisited] = useState(false);
+    const [activeTab, setActiveTab] = useState<'itinerary' | 'map'>('itinerary');
 
 
     useEffect(() => {
@@ -86,6 +88,15 @@ const App: React.FC = () => {
         setIsSavedTripsDrawerOpen(true);
     }, [itinerary, tripName, city, savedTrips]);
 
+    const handleRenameTrip = useCallback((tripId: string, newName: string) => {
+        if (!newName.trim()) return;
+        const updatedTrips = savedTrips.map(trip =>
+            trip.id === tripId ? { ...trip, name: newName.trim() } : trip
+        );
+        setSavedTrips(updatedTrips);
+        localStorage.setItem('tripPlans', JSON.stringify(updatedTrips));
+    }, [savedTrips]);
+
     const handleLoadTrip = useCallback((trip: TripPlan) => {
         setCity(trip.city);
         setItinerary(trip.itinerary);
@@ -146,6 +157,7 @@ const App: React.FC = () => {
     
     const handleMarkerClick = useCallback((itemId: string | null) => {
         setSelectedItemId(itemId);
+        setActiveTab('itinerary');
     }, []);
     
     const handleClearLodging = () => {
@@ -277,15 +289,15 @@ const App: React.FC = () => {
                 </div>
             )}
 
-            <main className="flex-grow flex flex-col md:flex-row-reverse overflow-hidden relative">
-                <div className="w-full md:w-2/3 h-1/2 md:h-full relative">
+            <main className="flex-grow flex flex-col md:flex-row-reverse overflow-hidden relative pb-16 md:pb-0">
+                <div className={`w-full md:w-2/3 h-full relative ${activeTab === 'map' ? 'block' : 'hidden'} md:block`}>
                      <MapWrapper 
                         itinerary={itinerary} 
                         onMarkerClick={handleMarkerClick}
                         selectedItemId={selectedItemId}
                     />
                 </div>
-                <div className="w-full md:w-1/3 h-1/2 md:h-full bg-white shadow-lg overflow-y-auto">
+                <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'itinerary' ? 'block' : 'hidden'} md:block`}>
                      {(isLoading || isAddingVisited) && (
                         <div className="flex justify-center items-center h-full flex-col gap-4 p-4 text-center">
                             <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
@@ -320,12 +332,14 @@ const App: React.FC = () => {
                     )}
                 </div>
             </main>
+            <BottomNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
             <SavedTrips
                 isOpen={isSavedTripsDrawerOpen}
                 onClose={() => setIsSavedTripsDrawerOpen(false)}
                 savedTrips={savedTrips}
                 onLoad={handleLoadTrip}
                 onDelete={handleDeleteTrip}
+                onRename={handleRenameTrip}
             />
             <VisitedPlaces
                 isOpen={isVisitedDrawerOpen}

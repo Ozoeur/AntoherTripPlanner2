@@ -1,7 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { TripPlan } from '../types';
-import { FolderIcon, TrashIcon, MapPinIcon } from './Icons';
+import { FolderIcon, TrashIcon, MapPinIcon, EditIcon } from './Icons';
 
 interface SavedTripsProps {
     isOpen: boolean;
@@ -9,10 +9,32 @@ interface SavedTripsProps {
     savedTrips: TripPlan[];
     onLoad: (trip: TripPlan) => void;
     onDelete: (tripId: string) => void;
+    onRename: (tripId: string, newName: string) => void;
 }
 
-const SavedTrips: React.FC<SavedTripsProps> = ({ isOpen, onClose, savedTrips, onLoad, onDelete }) => {
+const SavedTrips: React.FC<SavedTripsProps> = ({ isOpen, onClose, savedTrips, onLoad, onDelete, onRename }) => {
+    const [editingTripId, setEditingTripId] = useState<string | null>(null);
+    const [newName, setNewName] = useState('');
+
     if (!isOpen) return null;
+
+    const handleStartEdit = (trip: TripPlan) => {
+        setEditingTripId(trip.id);
+        setNewName(trip.name);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingTripId(null);
+        setNewName('');
+    };
+
+    const handleSaveEdit = () => {
+        if (editingTripId && newName.trim()) {
+            onRename(editingTripId, newName.trim());
+        }
+        handleCancelEdit();
+    };
+
 
     return (
         <div 
@@ -41,30 +63,54 @@ const SavedTrips: React.FC<SavedTripsProps> = ({ isOpen, onClose, savedTrips, on
                         <ul className="space-y-3">
                             {savedTrips.map(trip => (
                                 <li key={trip.id} className="bg-gray-50 border rounded-lg p-4 hover:shadow-md transition-shadow">
-                                    <div className="flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-lg text-gray-900">{trip.name}</h3>
-                                            <p className="text-sm text-gray-600 flex items-center gap-1.5 mt-1">
-                                                <MapPinIcon className="h-4 w-4 text-gray-400" />
-                                                {trip.city}
-                                            </p>
+                                    {editingTripId === trip.id ? (
+                                        <div className="flex flex-col gap-3">
+                                            <input
+                                                type="text"
+                                                value={newName}
+                                                onChange={(e) => setNewName(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-bold"
+                                                autoFocus
+                                            />
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={handleCancelEdit} className="px-4 py-1.5 bg-gray-200 text-gray-800 text-sm font-semibold rounded-full hover:bg-gray-300 transition">Cancel</button>
+                                                <button onClick={handleSaveEdit} className="px-4 py-1.5 bg-green-500 text-white text-sm font-semibold rounded-full hover:bg-green-600 transition">Save</button>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <button 
-                                                onClick={() => onLoad(trip)}
-                                                className="px-4 py-1.5 bg-blue-500 text-white text-sm font-semibold rounded-full hover:bg-blue-600 transition"
-                                            >
-                                                Load
-                                            </button>
-                                            <button 
-                                                onClick={() => onDelete(trip.id)}
-                                                className="p-2 text-red-500 hover:bg-red-100 rounded-full transition"
-                                                aria-label="Delete trip"
-                                            >
-                                                <TrashIcon className="h-5 w-5" />
-                                            </button>
+                                    ) : (
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-gray-900">{trip.name}</h3>
+                                                <p className="text-sm text-gray-600 flex items-center gap-1.5 mt-1">
+                                                    <MapPinIcon className="h-4 w-4 text-gray-400" />
+                                                    {trip.city}
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                                <button 
+                                                    onClick={() => onLoad(trip)}
+                                                    className="px-4 py-1.5 bg-blue-500 text-white text-sm font-semibold rounded-full hover:bg-blue-600 transition"
+                                                >
+                                                    Load
+                                                </button>
+                                                <button 
+                                                    onClick={() => handleStartEdit(trip)}
+                                                    className="p-2 text-gray-500 hover:bg-gray-200 rounded-full transition"
+                                                    aria-label="Rename trip"
+                                                >
+                                                    <EditIcon className="h-5 w-5" />
+                                                </button>
+                                                <button 
+                                                    onClick={() => onDelete(trip.id)}
+                                                    className="p-2 text-red-500 hover:bg-red-100 rounded-full transition"
+                                                    aria-label="Delete trip"
+                                                >
+                                                    <TrashIcon className="h-5 w-5" />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </li>
                             ))}
                         </ul>
