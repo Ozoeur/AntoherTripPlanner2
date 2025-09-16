@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ItineraryItem } from '../types';
-import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon } from './Icons';
+import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon, MoreVerticalIcon } from './Icons';
 import EditItemModal from './EditItemModal';
 import AddItemModal from './AddItemModal';
 
@@ -32,7 +32,7 @@ const TransportIcon = ({ transport }: { transport: ItineraryItem['transport'] })
 };
 
 const CategoryIcon = ({ category }: { category: ItineraryItem['category'] }) => {
-    const commonClasses = "h-5 w-5 text-gray-600 flex-shrink-0";
+    const commonClasses = "h-6 w-6 text-gray-600 flex-shrink-0";
     switch (category) {
         case 'activity': return <ActivityIcon className={commonClasses} aria-label="Activity" />;
         case 'landmark': return <LandmarkIcon className={commonClasses} aria-label="Landmark" />;
@@ -46,7 +46,9 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
     const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
     const [isAdding, setIsAdding] = useState(false);
+    const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
     const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
+    const actionMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
         if (selectedItemId) {
@@ -59,6 +61,18 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
             }
         }
     }, [selectedItemId]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
+                setActionMenuOpenId(null);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
         setDraggedItemId(id);
@@ -158,58 +172,64 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                                             <span className="text-xs font-bold text-blue-600">{index + 1}</span>
                                         </div>
                                     </div>
-                                    <div className="bg-gray-50 p-4 rounded-lg shadow-sm flex-grow border border-gray-200 relative">
+                                    <div className="bg-gray-50 p-3 md:p-4 rounded-lg shadow-sm flex-grow border border-gray-200 relative">
                                         {isReplacing && (
                                             <div className="absolute inset-0 bg-white/70 flex justify-center items-center rounded-lg z-20">
                                                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                                             </div>
                                         )}
-                                        <div className="absolute top-2 right-2 flex gap-1">
+                                        <div className="absolute top-2 right-2 flex items-center gap-1">
                                             {!isLodgingStartEnd && (
-                                                 <button
+                                                <button
                                                     onClick={() => onMarkAsVisited(item)}
-                                                    className={`p-1.5 rounded-full transition-colors ${isVisited ? 'text-green-500' : 'text-gray-500 hover:bg-gray-200'}`}
+                                                    className={`p-1.5 rounded-full transition-colors ${isVisited ? 'text-green-500' : 'text-gray-400 hover:bg-gray-200'}`}
                                                     aria-label={isVisited ? "Marked as visited" : "Mark as visited"}
                                                     disabled={isVisited}
                                                     title={isVisited ? "Already visited" : "Mark as visited"}
                                                 >
-                                                    <CheckCircleIcon className="h-4 w-4" />
+                                                    <CheckCircleIcon className="h-5 w-5" />
                                                 </button>
                                             )}
                                             {!isLodgingStartEnd && (
-                                                <button 
-                                                    onClick={() => onSuggestAlternative(item.id)}
-                                                    className="p-1.5 text-green-600 hover:bg-green-100 rounded-full transition-colors disabled:text-gray-400 disabled:hover:bg-transparent"
-                                                    aria-label="Suggest alternative"
-                                                    disabled={isReplacing}
-                                                    title="Suggest an alternative"
-                                                >
-                                                    <ShuffleIcon className="h-4 w-4" />
-                                                </button>
-                                            )}
-                                            <button 
-                                                onClick={() => handleEditClick(item)} 
-                                                className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-full transition-colors"
-                                                aria-label="Edit item"
-                                            >
-                                                <EditIcon className="h-4 w-4" />
-                                            </button>
-                                            {!isLodgingStartEnd && (
-                                                <button 
-                                                    onClick={() => handleDeleteItem(item.id)} 
-                                                    className="p-1.5 text-red-500 hover:bg-red-100 rounded-full transition-colors"
-                                                    aria-label="Delete item"
-                                                >
-                                                    <TrashIcon className="h-4 w-4" />
-                                                </button>
+                                                <div className="relative">
+                                                    <button onClick={() => setActionMenuOpenId(actionMenuOpenId === item.id ? null : item.id)} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-full transition-colors" aria-label="More options">
+                                                        <MoreVerticalIcon className="h-5 w-5" />
+                                                    </button>
+                                                    {actionMenuOpenId === item.id && (
+                                                        <div ref={actionMenuRef} className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg z-30 border border-gray-100">
+                                                            <ul className="py-1">
+                                                                <li>
+                                                                    <button onClick={() => { onSuggestAlternative(item.id); setActionMenuOpenId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:text-gray-400" disabled={isReplacing}>
+                                                                        <ShuffleIcon className="h-4 w-4 text-green-600" />
+                                                                        Suggest an alternative
+                                                                    </button>
+                                                                </li>
+                                                                <li>
+                                                                    <button onClick={() => { handleEditClick(item); setActionMenuOpenId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                                                        <EditIcon className="h-4 w-4 text-gray-500" />
+                                                                        Edit details
+                                                                    </button>
+                                                                </li>
+                                                                <li>
+                                                                    <button onClick={() => { handleDeleteItem(item.id); setActionMenuOpenId(null); }} className="w-full text-left flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+                                                                        <TrashIcon className="h-4 w-4" />
+                                                                        Remove from trip
+                                                                    </button>
+                                                                </li>
+                                                            </ul>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-3 pr-24">
+                                        <div className="flex items-start gap-3 pr-20">
                                             <CategoryIcon category={item.category} />
-                                            <h3 className={`font-bold text-lg text-gray-800 ${isVisited ? 'line-through' : ''}`}>{item.name}</h3>
+                                            <div className="flex-grow">
+                                                <h3 className={`font-bold text-base md:text-lg text-gray-800 ${isVisited ? 'line-through' : ''}`}>{item.name}</h3>
+                                                <p className="text-sm text-gray-500">{item.time}</p>
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-gray-500 mb-2">{item.time}</p>
-                                        <p className="text-gray-600 mb-3">{item.description}</p>
+                                        <p className="text-sm md:text-base text-gray-600 mt-2 mb-3">{item.description}</p>
                                         <div className="flex items-center text-sm font-medium text-gray-700 capitalize p-2 bg-gray-200 rounded-md">
                                             <TransportIcon transport={item.transport} />
                                             <span>{item.transport === 'start' ? 'Starting Point' : `By ${item.transport}`}</span>

@@ -74,8 +74,8 @@ const SavedTrips: React.FC<SavedTripsProps> = ({ isOpen, onClose, savedTrips, on
                                                 autoFocus
                                             />
                                             <div className="flex justify-end gap-2">
-                                                <button onClick={handleCancelEdit} className="px-4 py-1.5 bg-gray-200 text-gray-800 text-sm font-semibold rounded-full hover:bg-gray-300 transition">Cancel</button>
-                                                <button onClick={handleSaveEdit} className="px-4 py-1.5 bg-green-500 text-white text-sm font-semibold rounded-full hover:bg-green-600 transition">Save</button>
+                                                <button onClick={handleCancelEdit} className="px-4 py-2 bg-gray-200 text-gray-800 text-sm font-semibold rounded-full hover:bg-gray-300 transition">Cancel</button>
+                                                <button onClick={handleSaveEdit} className="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-full hover:bg-green-600 transition">Save</button>
                                             </div>
                                         </div>
                                     ) : (
@@ -90,7 +90,7 @@ const SavedTrips: React.FC<SavedTripsProps> = ({ isOpen, onClose, savedTrips, on
                                             <div className="flex items-center gap-1 flex-shrink-0 ml-2">
                                                 <button 
                                                     onClick={() => onLoad(trip)}
-                                                    className="px-4 py-1.5 bg-blue-500 text-white text-sm font-semibold rounded-full hover:bg-blue-600 transition"
+                                                    className="px-4 py-2 bg-blue-500 text-white text-sm font-semibold rounded-full hover:bg-blue-600 transition"
                                                 >
                                                     Load
                                                 </button>

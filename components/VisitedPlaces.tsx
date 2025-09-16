@@ -62,7 +62,7 @@ const VisitedPlaces: React.FC<VisitedPlacesProps> = ({ isOpen, onClose, visitedP
                                                     <div title={isTripActive ? "Add to current trip" : "You must have an active itinerary to add a place."}>
                                                         <button 
                                                             onClick={() => onAddToItinerary(place)}
-                                                            className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
+                                                            className="p-2 text-blue-500 hover:text-blue-700 hover:bg-blue-50 rounded-full transition disabled:text-gray-300 disabled:hover:bg-transparent disabled:cursor-not-allowed"
                                                             aria-label={`Add ${place} to trip`}
                                                             disabled={!isTripActive}
                                                         >
@@ -71,7 +71,7 @@ const VisitedPlaces: React.FC<VisitedPlacesProps> = ({ isOpen, onClose, visitedP
                                                     </div>
                                                     <button 
                                                         onClick={() => onManage('delete_one', city, place)}
-                                                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
+                                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition"
                                                         aria-label={`Remove ${place}`}
                                                     >
                                                         <TrashIcon className="h-4 w-4" />

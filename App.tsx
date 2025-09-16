@@ -267,7 +267,7 @@ const App: React.FC = () => {
                 <div className="container mx-auto flex justify-between items-center gap-4">
                     <div className="flex items-center gap-3">
                          <MapIcon className="h-8 w-8 text-blue-600" />
-                        <h1 className="text-2xl font-bold text-gray-800">Another Trip Planner</h1>
+                        <h1 className="text-xl md:text-2xl font-bold text-gray-800">Another Trip Planner</h1>
                     </div>
                      {/* --- Desktop Search Controls --- */}
                      <div className="w-full sm:w-auto hidden md:flex flex-col items-center sm:items-end gap-2">
