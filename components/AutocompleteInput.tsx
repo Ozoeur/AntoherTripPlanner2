@@ -41,6 +41,11 @@ const getIconForType = (type: string, classType: string) => {
         case 'ruins':
         case 'archaeological_site':
         case 'place_of_worship':
+        case 'cathedral':
+        case 'church':
+        case 'mosque':
+        case 'synagogue':
+        case 'temple':
             return <LandmarkIcon {...iconProps} />;
         case 'hotel':
         case 'motel':
@@ -53,12 +58,15 @@ const getIconForType = (type: string, classType: string) => {
         case 'supermarket':
         case 'department_store':
         case 'bakery':
+        case 'convenience':
             return <ShopIcon {...iconProps} />;
         case 'park':
         case 'cinema':
         case 'theatre':
         case 'stadium':
         case 'sports_centre':
+        case 'pitch':
+        case 'playground':
             return <ActivityIcon {...iconProps} />;
         default:
             if (classType === 'tourism' || classType === 'historic') return <LandmarkIcon {...iconProps} />;
@@ -72,6 +80,7 @@ const formatDisplayName = (displayName: string, address: { [key: string]: string
     const title = parts[0].trim();
     
     let subtitle = '';
+    // Prioritize structured address details for clarity
     if (address.road && address.city) {
         subtitle = `${address.road}, ${address.city}`;
     } else if (address.suburb && address.city) {
@@ -79,7 +88,8 @@ const formatDisplayName = (displayName: string, address: { [key: string]: string
     } else if (address.city && address.country) {
         subtitle = `${address.city}, ${address.country}`;
     } else if (parts.length > 1) {
-        subtitle = parts.slice(1).join(',').trim();
+        // Fallback to a more concise version of the display name
+        subtitle = parts.slice(1, 3).join(', ').trim();
     }
 
     return { title, subtitle };

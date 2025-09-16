@@ -401,20 +401,6 @@ const App: React.FC = () => {
                     />
                 </div>
 
-                {!isLoading && isAddingStop && (
-                    <AddStopPanel
-                        onSave={handleAddItem}
-                        onCancel={handleCancelAddStop}
-                        onSearchResultsChange={setSearchResults}
-                        onSearchResultSelect={handleSearchResultSelect}
-                        searchBounds={mapViewbox}
-                        selectedSearchResult={selectedSearchResult}
-                        onClearSelection={handleClearSelectedSearchResult}
-                        cityContext={city}
-                        isSaving={isAddingItem}
-                    />
-                )}
-
                 <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'map' || isAddingStop ? 'hidden' : 'block'} md:block`}>
                     {activeTab === 'search' && (
                         <div className="flex md:hidden h-full flex-col items-center justify-center p-6 text-center">
@@ -459,6 +445,21 @@ const App: React.FC = () => {
                     </div>
                 </div>
             </main>
+
+            {!isLoading && isAddingStop && (
+                <AddStopPanel
+                    onSave={handleAddItem}
+                    onCancel={handleCancelAddStop}
+                    onSearchResultsChange={setSearchResults}
+                    onSearchResultSelect={handleSearchResultSelect}
+                    searchBounds={mapViewbox}
+                    selectedSearchResult={selectedSearchResult}
+                    onClearSelection={handleClearSelectedSearchResult}
+                    cityContext={city}
+                    isSaving={isAddingItem}
+                />
+            )}
+
             <BottomNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
             <SavedTrips isOpen={isSavedTripsDrawerOpen} onClose={() => setIsSavedTripsDrawerOpen(false)} savedTrips={savedTrips} onLoad={handleLoadTrip} onDelete={handleDeleteTrip} onRename={handleRenameTrip}/>
             <VisitedPlaces isOpen={isVisitedDrawerOpen} onClose={() => setIsVisitedDrawerOpen(false)} visitedPlaces={completedActivities} onManage={handleManageVisitedPlaces} onAddToItinerary={handleAddVisitedPlaceToItinerary} isTripActive={itinerary.length > 0}/>
