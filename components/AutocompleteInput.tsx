@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { SearchResult } from '../types';
 
 // Define the structure of a Nominatim search result
 interface NominatimResult {
@@ -13,11 +14,12 @@ interface NominatimResult {
 interface AutocompleteInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'onSelect'> {
     value: string;
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    onSelect: (selection: { name: string; lat: number; lng: number; boundingbox?: [string, string, string, string] }) => void;
+    onSelect: (selection: { id: string; name: string; lat: number; lng: number; boundingbox?: [string, string, string, string] }) => void;
+    onResultsChange?: (results: SearchResult[]) => void;
     viewbox?: [string, string, string, string] | null;
 }
 
-const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, onSelect, viewbox, ...props }) => {
+const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, onSelect, onResultsChange, viewbox, ...props }) => {
     const [results, setResults] = useState<NominatimResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showResults, setShowResults] = useState(false);
@@ -36,6 +38,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, 
     const fetchResults = async (query: string, currentViewbox?: [string, string, string, string] | null) => {
         if (query.length < 3) {
             setResults([]);
+            if (onResultsChange) onResultsChange([]);
             return;
         }
         setIsLoading(true);
@@ -51,9 +54,18 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, 
             if (!response.ok) throw new Error('Network response was not ok');
             const data: NominatimResult[] = await response.json();
             setResults(data);
+            if(onResultsChange) {
+                onResultsChange(data.map(r => ({
+                    id: String(r.place_id),
+                    name: r.display_name,
+                    lat: parseFloat(r.lat),
+                    lng: parseFloat(r.lon)
+                })));
+            }
         } catch (error) {
             console.error("Failed to fetch from Nominatim:", error);
             setResults([]);
+            if (onResultsChange) onResultsChange([]);
         } finally {
             setIsLoading(false);
         }
@@ -78,12 +90,14 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, 
 
     const handleSelect = (result: NominatimResult) => {
         onSelect({
+            id: String(result.place_id),
             name: result.display_name,
             lat: parseFloat(result.lat),
             lng: parseFloat(result.lon),
             boundingbox: result.boundingbox,
         });
         setResults([]);
+        if (onResultsChange) onResultsChange([]);
         setShowResults(false);
     };
 

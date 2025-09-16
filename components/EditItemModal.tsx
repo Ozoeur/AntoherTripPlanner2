@@ -103,6 +103,7 @@ const EditItemModal: React.FC<EditItemModalProps> = ({ isOpen, onClose, onSave, 
                             <option value="landmark">Landmark</option>
                             <option value="activity">Activity</option>
                             <option value="restaurant">Restaurant</option>
+                            <option value="shop">Shop</option>
                             <option value="lodging">Lodging</option>
                             <option value="other">Other</option>
                         </select>

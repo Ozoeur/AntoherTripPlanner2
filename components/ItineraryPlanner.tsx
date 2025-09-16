@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ItineraryItem } from '../types';
-import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon, MoreVerticalIcon } from './Icons';
+import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon, MoreVerticalIcon, ShopIcon } from './Icons';
 import EditItemModal from './EditItemModal';
-import AddItemModal from './AddItemModal';
 
 interface ItineraryPlannerProps {
     itinerary: ItineraryItem[];
@@ -17,6 +16,7 @@ interface ItineraryPlannerProps {
     city: string;
     completedActivities: { [city: string]: string[] };
     showSaveButton: boolean;
+    onAddStop: () => void;
 }
 
 const TransportIcon = ({ transport }: { transport: ItineraryItem['transport'] }) => {
@@ -38,14 +38,14 @@ const CategoryIcon = ({ category }: { category: ItineraryItem['category'] }) => 
         case 'landmark': return <LandmarkIcon className={commonClasses} aria-label="Landmark" />;
         case 'restaurant': return <RestaurantIcon className={commonClasses} aria-label="Restaurant" />;
         case 'lodging': return <BedIcon className={commonClasses} aria-label="Lodging" />;
+        case 'shop': return <ShopIcon className={commonClasses} aria-label="Shop" />;
         default: return null;
     }
 };
 
-const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItinerary, tripName, setTripName, onSave, selectedItemId, onSuggestAlternative, replacingItemId, onMarkAsVisited, city, completedActivities, showSaveButton }) => {
+const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItinerary, tripName, setTripName, onSave, selectedItemId, onSuggestAlternative, replacingItemId, onMarkAsVisited, city, completedActivities, showSaveButton, onAddStop }) => {
     const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
-    const [isAdding, setIsAdding] = useState(false);
     const [actionMenuOpenId, setActionMenuOpenId] = useState<string | null>(null);
     const itemRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const actionMenuRef = useRef<HTMLDivElement | null>(null);
@@ -115,16 +115,6 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
     const handleDeleteItem = (idToDelete: string) => {
         setItinerary(prev => prev.filter(item => item.id !== idToDelete));
     };
-
-    const handleAddItem = (newItem: Omit<ItineraryItem, 'id'>) => {
-        const fullNewItem = {
-            ...newItem,
-            id: `${Date.now()}-new`,
-        };
-        setItinerary(prev => [...prev, fullNewItem]);
-        setIsAdding(false);
-    };
-
 
     return (
         <>
@@ -248,7 +238,7 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                     </div>
                      <div className="flex justify-center mt-4">
                         <button 
-                            onClick={() => setIsAdding(true)}
+                            onClick={onAddStop}
                             className="flex items-center gap-2 px-5 py-2 text-blue-600 bg-blue-50 rounded-full font-semibold hover:bg-blue-100 transition-colors border border-blue-200"
                         >
                             <PlusCircleIcon className="h-5 w-5" />
@@ -262,11 +252,6 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                 onClose={() => setEditingItem(null)}
                 onSave={handleSaveChanges}
                 item={editingItem}
-            />
-            <AddItemModal 
-                isOpen={isAdding}
-                onClose={() => setIsAdding(false)}
-                onSave={handleAddItem}
             />
         </>
     );

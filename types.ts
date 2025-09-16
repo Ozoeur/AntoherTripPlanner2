@@ -1,5 +1,4 @@
 
-
 export interface ItineraryItem {
     id: string;
     name: string;
@@ -8,7 +7,7 @@ export interface ItineraryItem {
     lat: number;
     lng: number;
     transport: 'walk' | 'metro' | 'bus' | 'taxi' | 'start' | 'car';
-    category: 'activity' | 'landmark' | 'restaurant' | 'lodging' | 'other';
+    category: 'activity' | 'landmark' | 'restaurant' | 'lodging' | 'shop' | 'other';
     travelTime?: string;
     imageUrl?: string;
 }
@@ -18,4 +17,11 @@ export interface TripPlan {
     name: string;
     city: string;
     itinerary: ItineraryItem[];
+}
+
+export interface SearchResult {
+  id: string;
+  name: string;
+  lat: number;
+  lng: number;
 }
