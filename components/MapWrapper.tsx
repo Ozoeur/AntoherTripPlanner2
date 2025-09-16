@@ -11,7 +11,6 @@ interface MapWrapperProps {
     searchResults?: SearchResult[];
     selectedSearchResultId?: string | null;
     onSearchResultMarkerClick?: (resultId: string) => void;
-    onViewboxChange?: (bounds: [string, string, string, string]) => void;
 }
 
 const getPolylineColor = (transport: ItineraryItem['transport']): string => {
@@ -58,7 +57,7 @@ const getCategoryIconSvg = (category: ItineraryItem['category']): string => {
     }
 };
 
-const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selectedItemId, activeTab, searchResults, selectedSearchResultId, onSearchResultMarkerClick, onViewboxChange }) => {
+const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selectedItemId, activeTab, searchResults, selectedSearchResultId, onSearchResultMarkerClick }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<L.Map | null>(null);
     const layerGroup = useRef<L.LayerGroup | null>(null);
@@ -70,34 +69,8 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selec
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             }).addTo(mapInstance.current);
             layerGroup.current = L.layerGroup().addTo(mapInstance.current);
-
-            // Add event listeners to report viewbox changes
-            const map = mapInstance.current;
-            if (map && onViewboxChange) {
-                const reportBounds = () => {
-                    const bounds = map.getBounds();
-                    const viewbox: [string, string, string, string] = [
-                        String(bounds.getSouth()),
-                        String(bounds.getNorth()),
-                        String(bounds.getWest()),
-                        String(bounds.getEast())
-                    ];
-                    onViewboxChange(viewbox);
-                };
-                map.on('moveend', reportBounds);
-                map.on('zoomend', reportBounds);
-                reportBounds(); // Initial report
-            }
         }
-
-        return () => {
-            const map = mapInstance.current;
-            if (map) {
-                map.off('moveend');
-                map.off('zoomend');
-            }
-        };
-    }, [onViewboxChange]);
+    }, []);
 
     useEffect(() => {
         if (!mapInstance.current || !layerGroup.current) return;
@@ -121,7 +94,7 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selec
                 marker.on('click', () => onSearchResultMarkerClick?.(result.id));
                 markers.push(marker);
             });
-            if (markers.length > 0 && !selectedSearchResultId) {
+            if (markers.length > 0) {
                 const featureGroup = L.featureGroup(markers);
                 mapInstance.current.fitBounds(featureGroup.getBounds(), { padding: [50, 50] });
             }

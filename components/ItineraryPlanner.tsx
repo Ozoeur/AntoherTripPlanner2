@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ItineraryItem } from '../types';
-import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon, MoreVerticalIcon, ShopIcon, ArrowUpIcon, ArrowDownIcon } from './Icons';
+import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon, MoreVerticalIcon, ShopIcon } from './Icons';
 import EditItemModal from './EditItemModal';
 
 interface ItineraryPlannerProps {
@@ -100,20 +100,6 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
         setItinerary(newItinerary);
         setDraggedItemId(null);
     };
-    
-    const handleMoveItem = (index: number, direction: 'up' | 'down') => {
-        if (direction === 'up' && index === 0) return;
-        if (direction === 'down' && index === itinerary.length - 1) return;
-    
-        const newItinerary = [...itinerary];
-        const item = newItinerary[index];
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        
-        newItinerary.splice(index, 1); // Remove item from original position
-        newItinerary.splice(newIndex, 0, item); // Insert item at new position
-        
-        setItinerary(newItinerary);
-    };
 
     const handleEditClick = (item: ItineraryItem) => {
         setEditingItem(item);
@@ -171,16 +157,8 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                                     onDrop={(e) => handleDrop(e, item.id)}
                                 >
                                     <div className="absolute left-0 top-1.5 flex items-center">
-                                        {/* Desktop drag handle */}
-                                        <div className="hidden md:block cursor-move">
-                                           <GripVerticalIcon className="h-6 w-5 text-gray-400" />
-                                        </div>
-                                        {/* Mobile move buttons */}
-                                        <div className="flex flex-col md:hidden -ml-2.5">
-                                            <button onClick={() => handleMoveItem(index, 'up')} disabled={index === 0} className="p-1 text-gray-500 hover:text-blue-600 disabled:text-gray-300"><ArrowUpIcon className="h-5 w-5"/></button>
-                                            <button onClick={() => handleMoveItem(index, 'down')} disabled={index === itinerary.length - 1} className="p-1 text-gray-500 hover:text-blue-600 disabled:text-gray-300"><ArrowDownIcon className="h-5 w-5"/></button>
-                                        </div>
-                                        <div className="flex items-center justify-center h-5 w-5 bg-white border-2 border-blue-500 rounded-full z-10 ml-1">
+                                        <GripVerticalIcon className="h-6 w-5 text-gray-400 cursor-move" />
+                                        <div className="flex items-center justify-center h-5 w-5 bg-white border-2 border-blue-500 rounded-full z-10">
                                             <span className="text-xs font-bold text-blue-600">{index + 1}</span>
                                         </div>
                                     </div>

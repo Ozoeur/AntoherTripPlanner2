@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SearchResult } from '../types';
-import { RestaurantIcon, LandmarkIcon, BedIcon, ShopIcon, MapPinIcon, ActivityIcon } from './Icons';
 
 // Define the structure of a Nominatim search result
 interface NominatimResult {
@@ -9,9 +8,6 @@ interface NominatimResult {
     lat: string;
     lon: string;
     boundingbox?: [string, string, string, string];
-    address: { [key: string]: string };
-    class: string;
-    type: string;
 }
 
 // Define the props for our component, extending standard input props
@@ -21,86 +17,15 @@ interface AutocompleteInputProps extends Omit<React.InputHTMLAttributes<HTMLInpu
     onSelect: (selection: { id: string; name: string; lat: number; lng: number; boundingbox?: [string, string, string, string] }) => void;
     onResultsChange?: (results: SearchResult[]) => void;
     viewbox?: [string, string, string, string] | null;
-    cityContext?: string;
 }
 
-const getIconForType = (type: string, classType: string) => {
-    const iconProps = { className: "h-5 w-5 text-gray-500 flex-shrink-0" };
-    switch (type) {
-        case 'restaurant':
-        case 'cafe':
-        case 'fast_food':
-        case 'food_court':
-        case 'pub':
-            return <RestaurantIcon {...iconProps} />;
-        case 'museum':
-        case 'attraction':
-        case 'artwork':
-        case 'monument':
-        case 'castle':
-        case 'ruins':
-        case 'archaeological_site':
-        case 'place_of_worship':
-        case 'cathedral':
-        case 'church':
-        case 'mosque':
-        case 'synagogue':
-        case 'temple':
-            return <LandmarkIcon {...iconProps} />;
-        case 'hotel':
-        case 'motel':
-        case 'guest_house':
-        case 'hostel':
-        case 'alpine_hut':
-            return <BedIcon {...iconProps} />;
-        case 'shop':
-        case 'mall':
-        case 'supermarket':
-        case 'department_store':
-        case 'bakery':
-        case 'convenience':
-            return <ShopIcon {...iconProps} />;
-        case 'park':
-        case 'cinema':
-        case 'theatre':
-        case 'stadium':
-        case 'sports_centre':
-        case 'pitch':
-        case 'playground':
-            return <ActivityIcon {...iconProps} />;
-        default:
-            if (classType === 'tourism' || classType === 'historic') return <LandmarkIcon {...iconProps} />;
-            if (classType === 'shop' || classType === 'amenity') return <ShopIcon {...iconProps} />;
-            return <MapPinIcon {...iconProps} />;
-    }
-};
-
-const formatDisplayName = (displayName: string, address: { [key: string]: string }) => {
-    const parts = displayName.split(',');
-    const title = parts[0].trim();
-    
-    let subtitle = '';
-    // Prioritize structured address details for clarity
-    if (address.road && address.city) {
-        subtitle = `${address.road}, ${address.city}`;
-    } else if (address.suburb && address.city) {
-        subtitle = `${address.suburb}, ${address.city}`;
-    } else if (address.city && address.country) {
-        subtitle = `${address.city}, ${address.country}`;
-    } else if (parts.length > 1) {
-        // Fallback to a more concise version of the display name
-        subtitle = parts.slice(1, 3).join(', ').trim();
-    }
-
-    return { title, subtitle };
-};
-
-const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>(({ value, onChange, onSelect, onResultsChange, viewbox, cityContext, ...props }, ref) => {
+const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, onSelect, onResultsChange, viewbox, ...props }) => {
     const [results, setResults] = useState<NominatimResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showResults, setShowResults] = useState(false);
     const wrapperRef = useRef<HTMLDivElement>(null);
 
+    // Debounce utility to prevent API calls on every keystroke
     const debounce = <F extends (...args: any[]) => any>(func: F, delay: number) => {
         let timeoutId: ReturnType<typeof setTimeout>;
         return (...args: Parameters<F>): void => {
@@ -109,6 +34,7 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
         };
     };
 
+    // Fetches search results from Nominatim API
     const fetchResults = async (query: string, currentViewbox?: [string, string, string, string] | null) => {
         if (query.length < 3) {
             setResults([]);
@@ -117,11 +43,12 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
         }
         setIsLoading(true);
         try {
-            const contextualQuery = cityContext ? `${query}, ${cityContext}` : query;
-            let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(contextualQuery)}&limit=7&addressdetails=1`;
+            let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`;
             if (currentViewbox) {
+                // viewbox is in format: [lat_min, lat_max, lon_min, lon_max]
+                // Nominatim API expects: viewbox=<left>,<top>,<right>,<bottom> which is lon_min,lat_max,lon_max,lat_min
                 const [lat_min, lat_max, lon_min, lon_max] = currentViewbox;
-                url += `&viewbox=${lon_min},${lat_max},${lon_max},${lat_min}`;
+                url += `&viewbox=${lon_min},${lat_max},${lon_max},${lat_min}&bounded=1`;
             }
             const response = await fetch(url, { headers: { 'Accept-Language': 'en' } });
             if (!response.ok) throw new Error('Network response was not ok');
@@ -130,7 +57,7 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
             if(onResultsChange) {
                 onResultsChange(data.map(r => ({
                     id: String(r.place_id),
-                    name: r.display_name.split(',')[0].trim(), // Return cleaner name
+                    name: r.display_name,
                     lat: parseFloat(r.lat),
                     lng: parseFloat(r.lon)
                 })));
@@ -144,12 +71,13 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
         }
     };
 
-    const debouncedFetch = useCallback(debounce(fetchResults, 300), [cityContext]);
+    const debouncedFetch = useCallback(debounce(fetchResults, 300), []);
 
     useEffect(() => {
         debouncedFetch(value, viewbox);
     }, [value, viewbox, debouncedFetch]);
 
+    // Handle clicks outside the component to close the results dropdown
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -161,10 +89,9 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
     }, []);
 
     const handleSelect = (result: NominatimResult) => {
-        const cleanName = result.display_name.split(',')[0].trim();
         onSelect({
             id: String(result.place_id),
-            name: cleanName,
+            name: result.display_name,
             lat: parseFloat(result.lat),
             lng: parseFloat(result.lon),
             boundingbox: result.boundingbox,
@@ -177,13 +104,12 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
     return (
         <div className="relative w-full sm:w-auto" ref={wrapperRef}>
             <input
-                ref={ref}
                 type="text"
                 value={value}
                 onChange={onChange}
                 onFocus={() => setShowResults(true)}
                 autoComplete="off"
-                {...props}
+                {...props} // Pass down other props like className, placeholder, etc.
             />
             {showResults && value.length > 2 && (
                 <div className="absolute z-30 w-full mt-1 bg-white rounded-md shadow-lg max-h-60 overflow-y-auto border border-gray-200">
@@ -192,30 +118,23 @@ const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>((
                         <div className="p-3 text-sm text-gray-500">No results found.</div>
                     )}
                     <ul className="divide-y divide-gray-100">
-                        {results.map((result) => {
-                            const { title, subtitle } = formatDisplayName(result.display_name, result.address);
-                            return (
-                                <li
-                                    key={result.place_id}
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        handleSelect(result);
-                                    }}
-                                    className="p-3 hover:bg-blue-50 cursor-pointer text-sm text-gray-700 flex items-center gap-3"
-                                >
-                                    {getIconForType(result.type, result.class)}
-                                    <div className="flex-grow overflow-hidden">
-                                        <div className="font-semibold text-gray-800 truncate">{title}</div>
-                                        <div className="text-xs text-gray-500 truncate">{subtitle}</div>
-                                    </div>
-                                </li>
-                            );
-                        })}
+                        {results.map((result) => (
+                            <li
+                                key={result.place_id}
+                                onMouseDown={(e) => { // Use onMouseDown to fire before onBlur closes the dropdown
+                                    e.preventDefault();
+                                    handleSelect(result);
+                                }}
+                                className="p-3 hover:bg-blue-50 cursor-pointer text-sm text-gray-700"
+                            >
+                                {result.display_name}
+                            </li>
+                        ))}
                     </ul>
                 </div>
             )}
         </div>
     );
-});
+};
 
 export default AutocompleteInput;

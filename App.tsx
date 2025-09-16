@@ -4,7 +4,7 @@ import MapWrapper from './components/MapWrapper';
 import ItineraryPlanner from './components/ItineraryPlanner';
 import SavedTrips from './components/SavedTrips';
 import AutocompleteInput from './components/AutocompleteInput';
-import { generateItinerary, generateAlternative, getPlaceDetails, calculateTravelDetails } from './services/geminiService';
+import { generateItinerary, generateAlternative, getPlaceDetails } from './services/geminiService';
 import { MapIcon, ListIcon, SaveIcon, FolderIcon, AlertTriangleIcon, HistoryIcon } from './components/Icons';
 import VisitedPlaces from './components/VisitedPlaces';
 import BottomNavBar from './components/BottomNavBar';
@@ -31,10 +31,8 @@ const App: React.FC = () => {
     
     // State for the new "Add Stop" flow
     const [isAddingStop, setIsAddingStop] = useState<boolean>(false);
-    const [isAddingItem, setIsAddingItem] = useState<boolean>(false);
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
-    const [mapViewbox, setMapViewbox] = useState<[string, string, string, string] | null>(null);
 
 
     useEffect(() => {
@@ -248,7 +246,7 @@ const App: React.FC = () => {
             return;
         }
         setIsAddingStop(true);
-        setActiveTab('map'); // Switch to map view to see search results
+        setActiveTab('search'); // Switch to search mode to show the floating panel and highlight nav icon
     };
     
     const handleCancelAddStop = () => {
@@ -258,55 +256,14 @@ const App: React.FC = () => {
         setActiveTab('itinerary');
     };
 
-    const handleAddItem = async (newItemData: Omit<ItineraryItem, 'id' | 'travelTime' | 'imageUrl' | 'transport'>) => {
-        setIsAddingItem(true);
-        setError(null);
-        try {
-            const newItinerary = [...itinerary];
-
-            const parseTime = (timeStr: string): number => {
-                if (!timeStr || typeof timeStr !== 'string') return 9999;
-                const cleaned = timeStr.replace(/[^0-9]/g, '');
-                return parseInt(cleaned.padStart(4, '0'), 10);
-            };
-    
-            const newItemTime = parseTime(newItemData.time);
-            const insertionIndex = newItinerary.findIndex(item => parseTime(item.time) > newItemTime);
-            const previousItem = insertionIndex > 0 ? newItinerary[insertionIndex - 1] : null;
-
-            let transportDetails: { transport: ItineraryItem['transport']; travelTime?: string } = {
-                transport: previousItem ? 'car' : 'start', // Default, will be replaced
-                travelTime: 'N/A'
-            };
-
-            if (previousItem) {
-                // Let AI determine the best transport and travel time
-                const details = await calculateTravelDetails(previousItem, newItemData, city);
-                transportDetails = details;
-            }
-    
-            const newItem: ItineraryItem = {
-                ...newItemData,
-                id: `${Date.now()}-manual`,
-                transport: transportDetails.transport,
-                travelTime: transportDetails.travelTime
-            };
-        
-            if (insertionIndex === -1) {
-                newItinerary.push(newItem);
-            } else {
-                newItinerary.splice(insertionIndex, 0, newItem);
-            }
-        
-            setItinerary(newItinerary);
-            if (currentTripId) setIsModified(true);
-            handleCancelAddStop();
-        } catch (err) {
-            console.error(err);
-            setError(err instanceof Error ? err.message : 'An unknown error occurred while adding the stop.');
-        } finally {
-            setIsAddingItem(false);
-        }
+    const handleAddItem = (newItemData: Omit<ItineraryItem, 'id' | 'travelTime' | 'imageUrl'>) => {
+        const newItem: ItineraryItem = {
+            ...newItemData,
+            id: `${Date.now()}-manual`,
+        };
+        setItinerary(prev => [...prev, newItem]);
+        if (currentTripId) setIsModified(true);
+        handleCancelAddStop();
     };
     
     const handleSearchResultSelect = (result: SearchResult) => {
@@ -397,12 +354,11 @@ const App: React.FC = () => {
                                 handleSearchResultSelect(result);
                             }
                         }}
-                        onViewboxChange={setMapViewbox}
                     />
                 </div>
 
                 <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'map' || isAddingStop ? 'hidden' : 'block'} md:block`}>
-                    {activeTab === 'search' && (
+                    {activeTab === 'search' && !isAddingStop && (
                         <div className="flex md:hidden h-full flex-col items-center justify-center p-6 text-center">
                             <div className="w-full max-w-sm flex flex-col items-stretch gap-4">
                                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Let's plan your day!</h2>
@@ -444,22 +400,19 @@ const App: React.FC = () => {
                         )}
                     </div>
                 </div>
+
+                {isAddingStop && (
+                    <AddStopPanel
+                        onSave={handleAddItem}
+                        onCancel={handleCancelAddStop}
+                        onSearchResultsChange={setSearchResults}
+                        onSearchResultSelect={handleSearchResultSelect}
+                        cityBounds={cityBounds}
+                        selectedSearchResult={selectedSearchResult}
+                        onClearSelection={handleClearSelectedSearchResult}
+                    />
+                )}
             </main>
-
-            {!isLoading && isAddingStop && (
-                <AddStopPanel
-                    onSave={handleAddItem}
-                    onCancel={handleCancelAddStop}
-                    onSearchResultsChange={setSearchResults}
-                    onSearchResultSelect={handleSearchResultSelect}
-                    searchBounds={mapViewbox}
-                    selectedSearchResult={selectedSearchResult}
-                    onClearSelection={handleClearSelectedSearchResult}
-                    cityContext={city}
-                    isSaving={isAddingItem}
-                />
-            )}
-
             <BottomNavBar activeTab={activeTab} setActiveTab={setActiveTab} />
             <SavedTrips isOpen={isSavedTripsDrawerOpen} onClose={() => setIsSavedTripsDrawerOpen(false)} savedTrips={savedTrips} onLoad={handleLoadTrip} onDelete={handleDeleteTrip} onRename={handleRenameTrip}/>
             <VisitedPlaces isOpen={isVisitedDrawerOpen} onClose={() => setIsVisitedDrawerOpen(false)} visitedPlaces={completedActivities} onManage={handleManageVisitedPlaces} onAddToItinerary={handleAddVisitedPlaceToItinerary} isTripActive={itinerary.length > 0}/>
