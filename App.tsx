@@ -4,7 +4,7 @@ import MapWrapper from './components/MapWrapper';
 import ItineraryPlanner from './components/ItineraryPlanner';
 import SavedTrips from './components/SavedTrips';
 import AutocompleteInput from './components/AutocompleteInput';
-import { generateItinerary, generateAlternative, getPlaceDetails } from './services/geminiService';
+import { generateItinerary, generateAlternative, getPlaceDetails, calculateTravelDetails } from './services/geminiService';
 import { MapIcon, ListIcon, SaveIcon, FolderIcon, AlertTriangleIcon, HistoryIcon } from './components/Icons';
 import VisitedPlaces from './components/VisitedPlaces';
 import BottomNavBar from './components/BottomNavBar';
@@ -31,6 +31,7 @@ const App: React.FC = () => {
     
     // State for the new "Add Stop" flow
     const [isAddingStop, setIsAddingStop] = useState<boolean>(false);
+    const [isAddingItem, setIsAddingItem] = useState<boolean>(false);
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
     const [mapViewbox, setMapViewbox] = useState<[string, string, string, string] | null>(null);
@@ -257,36 +258,55 @@ const App: React.FC = () => {
         setActiveTab('itinerary');
     };
 
-    const handleAddItem = (newItemData: Omit<ItineraryItem, 'id' | 'travelTime' | 'imageUrl'>) => {
-        const newItem: ItineraryItem = {
-            ...newItemData,
-            id: `${Date.now()}-manual`,
-        };
+    const handleAddItem = async (newItemData: Omit<ItineraryItem, 'id' | 'travelTime' | 'imageUrl' | 'transport'>) => {
+        setIsAddingItem(true);
+        setError(null);
+        try {
+            const newItinerary = [...itinerary];
+
+            const parseTime = (timeStr: string): number => {
+                if (!timeStr || typeof timeStr !== 'string') return 9999;
+                const cleaned = timeStr.replace(/[^0-9]/g, '');
+                return parseInt(cleaned.padStart(4, '0'), 10);
+            };
     
-        const newItinerary = [...itinerary];
+            const newItemTime = parseTime(newItemData.time);
+            const insertionIndex = newItinerary.findIndex(item => parseTime(item.time) > newItemTime);
+            const previousItem = insertionIndex > 0 ? newItinerary[insertionIndex - 1] : null;
+
+            let transportDetails: { transport: ItineraryItem['transport']; travelTime?: string } = {
+                transport: previousItem ? 'car' : 'start', // Default, will be replaced
+                travelTime: 'N/A'
+            };
+
+            if (previousItem) {
+                // Let AI determine the best transport and travel time
+                const details = await calculateTravelDetails(previousItem, newItemData, city);
+                transportDetails = details;
+            }
     
-        // Helper function to convert "HH:MM" to a comparable number.
-        const parseTime = (timeStr: string): number => {
-            if (!timeStr || typeof timeStr !== 'string') return 9999;
-            const cleaned = timeStr.replace(/[^0-9]/g, '');
-            // Pad with leading zero if necessary (e.g., "900" becomes "0900")
-            return parseInt(cleaned.padStart(4, '0'), 10);
-        };
-    
-        const newItemTime = parseTime(newItem.time);
-    
-        // Find the correct index to insert the new item to maintain chronological order.
-        const insertionIndex = newItinerary.findIndex(item => parseTime(item.time) > newItemTime);
-    
-        if (insertionIndex === -1) {
-            newItinerary.push(newItem); // Add to end if it's the latest time.
-        } else {
-            newItinerary.splice(insertionIndex, 0, newItem);
+            const newItem: ItineraryItem = {
+                ...newItemData,
+                id: `${Date.now()}-manual`,
+                transport: transportDetails.transport,
+                travelTime: transportDetails.travelTime
+            };
+        
+            if (insertionIndex === -1) {
+                newItinerary.push(newItem);
+            } else {
+                newItinerary.splice(insertionIndex, 0, newItem);
+            }
+        
+            setItinerary(newItinerary);
+            if (currentTripId) setIsModified(true);
+            handleCancelAddStop();
+        } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : 'An unknown error occurred while adding the stop.');
+        } finally {
+            setIsAddingItem(false);
         }
-    
-        setItinerary(newItinerary);
-        if (currentTripId) setIsModified(true);
-        handleCancelAddStop();
     };
     
     const handleSearchResultSelect = (result: SearchResult) => {
@@ -380,8 +400,23 @@ const App: React.FC = () => {
                         onViewboxChange={setMapViewbox}
                     />
                 </div>
-                <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'map' ? 'hidden' : 'block'} md:block`}>
-                    {activeTab === 'search' && !isAddingStop && (
+
+                {!isLoading && isAddingStop && (
+                    <AddStopPanel
+                        onSave={handleAddItem}
+                        onCancel={handleCancelAddStop}
+                        onSearchResultsChange={setSearchResults}
+                        onSearchResultSelect={handleSearchResultSelect}
+                        searchBounds={mapViewbox}
+                        selectedSearchResult={selectedSearchResult}
+                        onClearSelection={handleClearSelectedSearchResult}
+                        cityContext={city}
+                        isSaving={isAddingItem}
+                    />
+                )}
+
+                <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'map' || isAddingStop ? 'hidden' : 'block'} md:block`}>
+                    {activeTab === 'search' && (
                         <div className="flex md:hidden h-full flex-col items-center justify-center p-6 text-center">
                             <div className="w-full max-w-sm flex flex-col items-stretch gap-4">
                                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Let's plan your day!</h2>
@@ -393,7 +428,7 @@ const App: React.FC = () => {
                         </div>
                     )}
                     
-                    <div className={`${activeTab === 'itinerary' || isAddingStop ? 'block' : 'hidden'} md:block h-full`}>
+                    <div className={`${activeTab === 'itinerary' ? 'block' : 'hidden'} md:block h-full`}>
                         {isLoading && (
                             <div className="flex justify-center items-center h-full flex-col gap-4 p-4 text-center">
                                 <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
@@ -402,20 +437,7 @@ const App: React.FC = () => {
                             </div>
                         )}
 
-                        {!isLoading && isAddingStop && (
-                            <AddStopPanel
-                                onSave={handleAddItem}
-                                onCancel={handleCancelAddStop}
-                                onSearchResultsChange={setSearchResults}
-                                onSearchResultSelect={handleSearchResultSelect}
-                                searchBounds={mapViewbox}
-                                selectedSearchResult={selectedSearchResult}
-                                onClearSelection={handleClearSelectedSearchResult}
-                                cityContext={city}
-                            />
-                        )}
-
-                        {!isLoading && !isAddingStop && itinerary.length > 0 && (
+                        {!isLoading && itinerary.length > 0 && (
                             <ItineraryPlanner
                                 itinerary={itinerary} setItinerary={setItineraryAndMarkModified}
                                 tripName={tripName} setTripName={setTripNameAndMarkModified}
@@ -427,7 +449,7 @@ const App: React.FC = () => {
                             />
                         )}
                         
-                        {!isLoading && !isAddingStop && itinerary.length === 0 && (
+                        {!isLoading && itinerary.length === 0 && (
                              <div className="flex justify-center items-center h-full flex-col gap-4 p-8 text-center">
                                 <ListIcon className="h-24 w-24 text-gray-300" />
                                 <h2 className="text-2xl font-bold text-gray-700">Your adventure awaits!</h2>

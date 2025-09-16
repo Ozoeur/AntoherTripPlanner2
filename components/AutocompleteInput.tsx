@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, forwardRef } from 'react';
 import { SearchResult } from '../types';
 import { RestaurantIcon, LandmarkIcon, BedIcon, ShopIcon, MapPinIcon, ActivityIcon } from './Icons';
 
@@ -85,7 +85,7 @@ const formatDisplayName = (displayName: string, address: { [key: string]: string
     return { title, subtitle };
 };
 
-const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, onSelect, onResultsChange, viewbox, cityContext, ...props }) => {
+const AutocompleteInput = forwardRef<HTMLInputElement, AutocompleteInputProps>(({ value, onChange, onSelect, onResultsChange, viewbox, cityContext, ...props }, ref) => {
     const [results, setResults] = useState<NominatimResult[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [showResults, setShowResults] = useState(false);
@@ -167,6 +167,7 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, 
     return (
         <div className="relative w-full sm:w-auto" ref={wrapperRef}>
             <input
+                ref={ref}
                 type="text"
                 value={value}
                 onChange={onChange}
@@ -205,6 +206,6 @@ const AutocompleteInput: React.FC<AutocompleteInputProps> = ({ value, onChange, 
             )}
         </div>
     );
-};
+});
 
 export default AutocompleteInput;

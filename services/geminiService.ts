@@ -77,6 +77,19 @@ const placeDetailsSchema = {
     required: ["name", "description", "lat", "lng"],
 };
 
+const travelDetailsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        transport: { 
+            type: Type.STRING, 
+            description: "The most efficient mode of transport, either 'walk' or 'metro'.",
+            enum: ['walk', 'metro']
+        },
+        travelTime: { type: Type.STRING, description: "Estimated travel time, e.g., 'approx. 15 mins'." },
+    },
+    required: ["transport", "travelTime"],
+};
+
 
 export const generateItinerary = async (city: string, lodging?: { name: string; lat: number; lng: number }, completedActivities: string[] = []): Promise<ItineraryItem[]> => {
     try {
@@ -209,5 +222,47 @@ export const getPlaceDetails = async (placeName: string, city: string): Promise<
     } catch (error) {
         console.error(`Error getting details for ${placeName}:`, error);
         throw new Error(`Failed to get details for ${placeName}. Please try again.`);
+    }
+};
+
+export const calculateTravelDetails = async (
+    previousItem: { name: string, lat: number, lng: number }, 
+    newItem: { name: string, lat: number, lng: number }, 
+    city: string
+): Promise<{ transport: 'walk' | 'metro'; travelTime: string; }> => {
+    try {
+        const prompt = `A tourist in ${city} is planning to go from "${previousItem.name}" (at coordinates ${previousItem.lat}, ${previousItem.lng}) to a new stop, "${newItem.name}" (at coordinates ${newItem.lat}, ${newItem.lng}). 
+        
+        Analyze the distance and typical transit options available in ${city}. 
+        
+        Your task is to determine the most suitable mode of transport between these two points, choosing ONLY between 'walk' or 'metro'.
+        - Choose 'walk' if the distance is reasonably short (e.g., under 20-25 minutes).
+        - Choose 'metro' if walking would be too long or if there's a convenient metro line connecting the two locations.
+
+        Also, provide a realistic estimated travel time for the chosen mode of transport (e.g., 'approx. 15 mins').
+        
+        Return ONLY the JSON object with the transport mode and travel time.`;
+        
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: travelDetailsSchema,
+            },
+        });
+
+        const jsonText = response.text.trim();
+        const parsedResponse = JSON.parse(jsonText);
+
+        if (!parsedResponse.transport || !parsedResponse.travelTime) {
+            throw new Error("Invalid travel details format received from AI.");
+        }
+        
+        return parsedResponse;
+
+    } catch (error) {
+        console.error("Error calculating travel details:", error);
+        throw new Error("Failed to calculate travel details. The AI service may be unavailable.");
     }
 };
