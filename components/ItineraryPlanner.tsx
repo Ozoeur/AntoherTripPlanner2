@@ -16,6 +16,7 @@ interface ItineraryPlannerProps {
     onMarkAsVisited: (item: ItineraryItem) => void;
     city: string;
     completedActivities: { [city: string]: string[] };
+    showSaveButton: boolean;
 }
 
 const TransportIcon = ({ transport }: { transport: ItineraryItem['transport'] }) => {
@@ -41,7 +42,7 @@ const CategoryIcon = ({ category }: { category: ItineraryItem['category'] }) => 
     }
 };
 
-const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItinerary, tripName, setTripName, onSave, selectedItemId, onSuggestAlternative, replacingItemId, onMarkAsVisited, city, completedActivities }) => {
+const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItinerary, tripName, setTripName, onSave, selectedItemId, onSuggestAlternative, replacingItemId, onMarkAsVisited, city, completedActivities, showSaveButton }) => {
     const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
     const [isAdding, setIsAdding] = useState(false);
@@ -121,13 +122,15 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                         onChange={(e) => setTripName(e.target.value)}
                         className="text-xl md:text-2xl font-bold text-gray-800 bg-transparent border-b-2 border-transparent focus:border-blue-500 outline-none flex-grow min-w-0"
                     />
-                    <button
-                        onClick={onSave}
-                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors text-sm"
-                    >
-                        <SaveIcon className="h-5 w-5" />
-                        Save
-                    </button>
+                    {showSaveButton && (
+                         <button
+                            onClick={onSave}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors text-sm"
+                        >
+                            <SaveIcon className="h-5 w-5" />
+                            Save
+                        </button>
+                    )}
                 </div>
                 <div className="flex-grow overflow-y-auto pr-2">
                     <div className="relative">

@@ -83,7 +83,7 @@ export const generateItinerary = async (city: string, lodging?: { name: string; 
         let prompt: string;
 
         const exclusionPrompt = completedActivities.length > 0 
-            ? `\nCrucially, do NOT include any of the following places in the itinerary as the user has already visited them: ${completedActivities.join(', ')}.`
+            ? `\nIMPORTANT: The user has already visited the following places in ${city}: ${completedActivities.join(', ')}. You MUST NOT include any of these places in the generated itinerary. This is a strict requirement.`
             : '';
         
         const baseInstructions = "For all items (lodging, activities, and restaurants), provide a name, a brief one-sentence description, precise latitude and longitude, a suggested time, the best mode of transport from the previous location (from 'walk', 'metro', 'bus', 'taxi', 'car'), a category (from 'activity', 'landmark', 'restaurant', 'lodging', 'other'), an estimated travelTime (e.g., 'approx. 15 mins') from the previous location, and a publicly accessible `imageUrl` to a high-quality, royalty-free photograph of the location. For the first item, travelTime can be null. Ensure the restaurants are categorized as 'restaurant'.";
@@ -141,19 +141,23 @@ export const generateAlternative = async (
         const itemIndex = fullItinerary.findIndex(item => item.id === itemToReplace.id);
         const previousItem = itemIndex > 0 ? fullItinerary[itemIndex - 1] : null;
 
+        // Combine completed activities with other items in the current itinerary to avoid all duplicates.
+        const otherItineraryItems = fullItinerary.filter(item => item.id !== itemToReplace.id).map(item => item.name);
+        const placesToExclude = [...new Set([...completedActivities, ...otherItineraryItems])];
+
         const prompt = `Generate a single, alternative travel itinerary item for a trip in ${city}. This new item is intended to replace an existing one in the user's schedule.
 
 Original Item to Replace:
 - Name: "${itemToReplace.name}" at ${itemToReplace.time} (${itemToReplace.category})
 - Description: "${itemToReplace.description}"
 
-The new suggestion should:
-1. Be a suitable alternative for the time slot around ${itemToReplace.time}.
-2. Be geographically logical, considering the previous location was "${previousItem?.name ?? 'the starting point'}".
-3. NOT be any of the following places the user has already visited in this city: ${completedActivities.join(', ') || 'None'}.
-4. Must be a different place than the original ("${itemToReplace.name}").
+The new suggestion must follow these strict rules:
+1. It must be a suitable alternative for the time slot around ${itemToReplace.time}.
+2. It must be geographically logical, considering the previous location was "${previousItem?.name ?? 'the starting point'}".
+3. It must NOT be any of the following places: ${placesToExclude.join(', ') || 'None'}. This is because the user has either already visited them or they are already part of the current trip plan. This is a critical instruction.
 
-Provide a response with a new name, a brief one-sentence description, precise latitude and longitude, a suggested time (close to the original), the best mode of transport from the previous location, a category (activity, landmark, restaurant, or other), an estimated travel time from the previous location, and a publicly accessible imageUrl for a high-quality, royalty-free photograph. The entire day's itinerary is provided for context of the day's flow: ${JSON.stringify(fullItinerary.map(i => ({name: i.name, time: i.time})))}.`;
+Provide a response with a new name, a brief one-sentence description, precise latitude and longitude, a suggested time (close to the original), the best mode of transport from the previous location, a category (activity, landmark, restaurant, or other), an estimated travel time from the previous location, and a publicly accessible imageUrl for a high-quality, royalty-free photograph. The full itinerary is provided for context of the day's flow: ${JSON.stringify(fullItinerary.map(i => ({name: i.name, time: i.time})))}.`;
+
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",

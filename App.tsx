@@ -26,6 +26,8 @@ const App: React.FC = () => {
     const [replacingItemId, setReplacingItemId] = useState<string | null>(null);
     const [isAddingVisited, setIsAddingVisited] = useState(false);
     const [activeTab, setActiveTab] = useState<'search' | 'itinerary' | 'map'>('search');
+    const [currentTripId, setCurrentTripId] = useState<string | null>(null);
+    const [isModified, setIsModified] = useState<boolean>(false);
 
 
     useEffect(() => {
@@ -58,6 +60,9 @@ const App: React.FC = () => {
         setError(null);
         setItinerary([]);
         setSelectedItemId(null);
+        setCurrentTripId(null);
+        setIsModified(false);
+
         try {
             const placesToAvoid = completedActivities[city] || [];
             const newItinerary = await generateItinerary(city, lodging ?? undefined, placesToAvoid);
@@ -77,17 +82,31 @@ const App: React.FC = () => {
             setError("Cannot save an empty trip or a trip without a name.");
             return;
         }
-        const newTrip: TripPlan = {
-            id: Date.now().toString(),
-            name: tripName,
-            city: city,
-            itinerary: itinerary,
-        };
-        const updatedTrips = [...savedTrips, newTrip];
-        setSavedTrips(updatedTrips);
-        localStorage.setItem('tripPlans', JSON.stringify(updatedTrips));
+
+        if (currentTripId) {
+             // Update existing trip
+            const updatedTrips = savedTrips.map(trip =>
+                trip.id === currentTripId ? { ...trip, name: tripName, itinerary: itinerary } : trip
+            );
+            setSavedTrips(updatedTrips);
+            localStorage.setItem('tripPlans', JSON.stringify(updatedTrips));
+        } else {
+             // Save new trip
+            const newTrip: TripPlan = {
+                id: Date.now().toString(),
+                name: tripName,
+                city: city,
+                itinerary: itinerary,
+            };
+            const updatedTrips = [...savedTrips, newTrip];
+            setSavedTrips(updatedTrips);
+            localStorage.setItem('tripPlans', JSON.stringify(updatedTrips));
+            setCurrentTripId(newTrip.id);
+        }
+        
+        setIsModified(false);
         setIsSavedTripsDrawerOpen(true);
-    }, [itinerary, tripName, city, savedTrips]);
+    }, [itinerary, tripName, city, savedTrips, currentTripId]);
 
     const handleRenameTrip = useCallback((tripId: string, newName: string) => {
         if (!newName.trim()) return;
@@ -102,6 +121,8 @@ const App: React.FC = () => {
         setCity(trip.city);
         setItinerary(trip.itinerary);
         setTripName(trip.name);
+        setCurrentTripId(trip.id);
+        setIsModified(false);
         setLodging(null);
         setLodgingInput('');
         setSelectedItemId(null); // Deselect item when loading a new trip
@@ -141,6 +162,7 @@ const App: React.FC = () => {
                     item.id === itemIdToReplace ? { ...newSuggestion, id: item.id } : item
                 )
             );
+            if (currentTripId) setIsModified(true);
     
             // Add the *replaced* item to the completed list for the current city
             // Use a Set to avoid duplicates
@@ -212,6 +234,7 @@ const App: React.FC = () => {
                 travelTime: 'N/A',
             };
             setItinerary(prev => [...prev, newItem]);
+            if (currentTripId) setIsModified(true);
             setIsVisitedDrawerOpen(false); // Close drawer after adding
         } catch (err) {
             console.error(err);
@@ -220,6 +243,23 @@ const App: React.FC = () => {
             setIsAddingVisited(false);
         }
     };
+
+    const setItineraryAndMarkModified = (updater: React.SetStateAction<ItineraryItem[]>) => {
+        setItinerary(updater);
+        if (currentTripId) {
+            setIsModified(true);
+        }
+    };
+
+    const setTripNameAndMarkModified = (name: string) => {
+        setTripName(name);
+        if (currentTripId) {
+            setIsModified(true);
+        }
+    };
+
+    const showSaveButton = itinerary.length > 0 && (!currentTripId || isModified);
+
 
     return (
         <div className="h-screen w-screen flex flex-col font-sans antialiased">
@@ -376,9 +416,9 @@ const App: React.FC = () => {
                         {!isLoading && !isAddingVisited && itinerary.length > 0 && (
                             <ItineraryPlanner
                                 itinerary={itinerary}
-                                setItinerary={setItinerary}
+                                setItinerary={setItineraryAndMarkModified}
                                 tripName={tripName}
-                                setTripName={setTripName}
+                                setTripName={setTripNameAndMarkModified}
                                 onSave={handleSaveTrip}
                                 selectedItemId={selectedItemId}
                                 onSuggestAlternative={handleSuggestAlternative}
@@ -386,6 +426,7 @@ const App: React.FC = () => {
                                 onMarkAsVisited={handleMarkAsVisited}
                                 city={city}
                                 completedActivities={completedActivities}
+                                showSaveButton={showSaveButton}
                             />
                         )}
                         
