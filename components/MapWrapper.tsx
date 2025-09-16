@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { ItineraryItem, SearchResult } from '../types';
@@ -11,6 +12,8 @@ interface MapWrapperProps {
     searchResults?: SearchResult[];
     selectedSearchResultId?: string | null;
     onSearchResultMarkerClick?: (resultId: string) => void;
+    // FIX: Add onViewboxChange prop to notify parent of map view changes
+    onViewboxChange?: (bounds: [string, string, string, string]) => void;
 }
 
 const getPolylineColor = (transport: ItineraryItem['transport']): string => {
@@ -57,11 +60,12 @@ const getCategoryIconSvg = (category: ItineraryItem['category']): string => {
     }
 };
 
-const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selectedItemId, activeTab, searchResults, selectedSearchResultId, onSearchResultMarkerClick }) => {
+const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selectedItemId, activeTab, searchResults, selectedSearchResultId, onSearchResultMarkerClick, onViewboxChange }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<L.Map | null>(null);
     const layerGroup = useRef<L.LayerGroup | null>(null);
 
+    // FIX: Separate useEffect for map initialization to run only once
     useEffect(() => {
         if (mapRef.current && !mapInstance.current) {
             mapInstance.current = L.map(mapRef.current, { center: [48.8566, 2.3522], zoom: 12 });
@@ -71,6 +75,29 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selec
             layerGroup.current = L.layerGroup().addTo(mapInstance.current);
         }
     }, []);
+
+    // FIX: Separate useEffect to handle viewbox change events
+    useEffect(() => {
+        const map = mapInstance.current;
+        if (!map || !onViewboxChange) return;
+
+        const handler = () => {
+            const bounds = map.getBounds();
+            const viewbox: [string, string, string, string] = [
+                bounds.getSouth().toString(),
+                bounds.getNorth().toString(),
+                bounds.getWest().toString(),
+                bounds.getEast().toString(),
+            ];
+            onViewboxChange(viewbox);
+        };
+
+        map.on('moveend', handler);
+        return () => {
+            map.off('moveend', handler);
+        };
+    }, [onViewboxChange]);
+
 
     useEffect(() => {
         if (!mapInstance.current || !layerGroup.current) return;

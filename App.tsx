@@ -1,14 +1,21 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ItineraryItem, TripPlan, SearchResult } from './types';
 import MapWrapper from './components/MapWrapper';
 import ItineraryPlanner from './components/ItineraryPlanner';
 import SavedTrips from './components/SavedTrips';
 import AutocompleteInput from './components/AutocompleteInput';
-import { generateItinerary, generateAlternative, getPlaceDetails } from './services/geminiService';
+import { generateItinerary, generateAlternative, getPlaceDetails, calculateTravelDetails } from './services/geminiService';
 import { MapIcon, ListIcon, SaveIcon, FolderIcon, AlertTriangleIcon, HistoryIcon } from './components/Icons';
 import VisitedPlaces from './components/VisitedPlaces';
 import BottomNavBar from './components/BottomNavBar';
 import AddStopPanel from './components/AddItemModal';
+
+const parseTime = (time: string): number => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+};
+
 
 const App: React.FC = () => {
     const [city, setCity] = useState<string>('');
@@ -32,7 +39,9 @@ const App: React.FC = () => {
     // State for the new "Add Stop" flow
     const [isAddingStop, setIsAddingStop] = useState<boolean>(false);
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
-    const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+    const [selectedPlaceFromMap, setSelectedPlaceFromMap] = useState<SearchResult | null>(null);
+    const [mapViewbox, setMapViewbox] = useState<[string, string, string, string] | null>(null);
+    const [isAddingItem, setIsAddingItem] = useState(false);
 
 
     useEffect(() => {
@@ -246,40 +255,91 @@ const App: React.FC = () => {
             return;
         }
         setIsAddingStop(true);
-        setActiveTab('search'); // Switch to search mode to show the floating panel and highlight nav icon
+        setActiveTab('map'); 
     };
     
     const handleCancelAddStop = () => {
         setIsAddingStop(false);
         setSearchResults([]);
-        setSelectedSearchResult(null);
+        setSelectedPlaceFromMap(null);
         setActiveTab('itinerary');
     };
+    
+    const handleAddItem = async (newItemData: Omit<ItineraryItem, 'id' | 'transport' | 'travelTime' | 'imageUrl'>) => {
+        setIsAddingItem(true);
+        setError(null);
+        try {
+            // Create a sorted list of the existing itinerary to find the previous stop
+            const sortedItinerary = [...itinerary].sort((a, b) => parseTime(a.time) - parseTime(b.time));
+            const newItemTime = parseTime(newItemData.time);
+    
+            let previousItem = lodging ? { ...lodging, time: '00:00' } : null;
+            for (const item of sortedItinerary) {
+                if (parseTime(item.time) < newItemTime) {
+                    previousItem = item;
+                } else {
+                    break;
+                }
+            }
+            if (!previousItem && sortedItinerary.length > 0) {
+                 // If no previous item found (i.e., new item is the earliest), use the first item as reference,
+                 // assuming the trip starts there. This may need more sophisticated logic if trips can start anywhere.
+                previousItem = sortedItinerary[0];
+            }
 
-    const handleAddItem = (newItemData: Omit<ItineraryItem, 'id' | 'travelTime' | 'imageUrl'>) => {
-        const newItem: ItineraryItem = {
-            ...newItemData,
-            id: `${Date.now()}-manual`,
-        };
-        setItinerary(prev => [...prev, newItem]);
-        if (currentTripId) setIsModified(true);
-        handleCancelAddStop();
+            if (!previousItem) {
+                throw new Error("Could not determine the previous location to calculate travel time.");
+            }
+    
+            const { transport, travelTime } = await calculateTravelDetails(
+                { lat: previousItem.lat, lng: previousItem.lng },
+                { lat: newItemData.lat, lng: newItemData.lng },
+                city
+            );
+    
+            const newItem: ItineraryItem = {
+                ...newItemData,
+                id: `${Date.now()}-manual`,
+                transport,
+                travelTime,
+            };
+    
+            const newItinerary = [...itinerary, newItem].sort((a, b) => parseTime(a.time) - parseTime(b.time));
+            setItinerary(newItinerary);
+    
+            if (currentTripId) setIsModified(true);
+            handleCancelAddStop();
+        } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : "An error occurred while adding the stop.");
+        } finally {
+            setIsAddingItem(false);
+        }
     };
     
-    const handleSearchResultSelect = (result: SearchResult) => {
-        setSelectedSearchResult(result);
+
+    const handleSearchForStops = (results: SearchResult[]) => {
+        setSearchResults(results);
+        setSelectedPlaceFromMap(null); // Clear previous selection when new results arrive
     };
 
-    const handleClearSelectedSearchResult = () => {
-        setSelectedSearchResult(null);
+    const handleSelectionChange = (selection: SearchResult | null) => {
+        setSelectedPlaceFromMap(selection);
+        // If a selection is made, we can clear the other search results for a cleaner map view
+        if (selection) {
+            setSearchResults([selection]);
+        }
     };
+
 
     const showSaveButton = itinerary.length > 0 && (!currentTripId || isModified);
+    const isMobileSearchVisible = activeTab === 'search' && !isAddingStop && itinerary.length === 0;
 
 
     return (
-        <div className="h-screen w-screen flex flex-col font-sans antialiased">
-            <header className="bg-white shadow-md z-20 p-4">
+        <div className="h-screen w-screen flex flex-col font-sans antialiased bg-gray-50">
+            {/* Header */}
+            <header className="bg-white shadow-md z-30 p-4">
                 <div className="container mx-auto flex justify-between items-center gap-4">
                     <div className="flex items-center gap-3">
                          <MapIcon className="h-8 w-8 text-blue-600" />
@@ -287,22 +347,26 @@ const App: React.FC = () => {
                     </div>
                      <div className="w-full sm:w-auto hidden md:flex flex-col items-center sm:items-end gap-2">
                         <div className="w-full sm:w-auto flex flex-wrap items-center justify-center sm:justify-end gap-2">
-                            <AutocompleteInput
+                           <div className="relative w-full sm:w-52">
+                             <AutocompleteInput
                                 value={city}
                                 onChange={(e) => { setCity(e.target.value); if (!e.target.value) setCityBounds(null); }}
-                                onSelect={({ name, boundingbox }) => { const cityName = name.split(',')[0].trim(); setCity(cityName); if (boundingbox) setCityBounds(boundingbox); }}
+                                onSelect={({ name, boundingbox }) => { const cityName = name.split(',')[0].trim(); setCity(cityName); if (boundingbox) { setCityBounds(boundingbox as [string, string, string, string]); setMapViewbox(boundingbox as [string, string, string, string]);} }}
                                 placeholder="Enter a city..."
-                                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                                 onKeyDown={(e) => e.key === 'Enter' && handlePlanDay()}
                             />
+                            </div>
+                            <div className="relative w-full sm:w-60">
                              <AutocompleteInput
                                 value={lodgingInput}
                                 onChange={(e) => { setLodgingInput(e.target.value); if (!e.target.value) setLodging(null); }}
                                 onSelect={({ name, lat, lng }) => { setLodging({ name, lat, lng }); setLodgingInput(name); }}
-                                viewbox={cityBounds}
+                                searchBounds={cityBounds}
                                 placeholder="Enter your hotel (optional)..."
-                                className="w-full sm:w-auto px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                             />
+                             </div>
                             <button
                                 onClick={handlePlanDay}
                                 disabled={isLoading}
@@ -318,7 +382,7 @@ const App: React.FC = () => {
                             </button>
                         </div>
                         {lodging && (
-                            <div className="flex items-center justify-center gap-2 text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full">
+                            <div className="flex items-center justify-center gap-2 text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full mt-1">
                                 <span>📍 Starting from: <strong>{lodging.name}</strong></span>
                                 <button onClick={handleClearLodging} className="font-mono text-red-500 hover:text-red-700 text-lg leading-none" aria-label="Clear lodging">&times;</button>
                             </div>
@@ -332,84 +396,110 @@ const App: React.FC = () => {
             </header>
 
             {error && (
-                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mx-4 my-2 flex items-center gap-3 z-10 rounded-md shadow-sm">
+                <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mx-4 my-2 flex items-center gap-3 z-20 rounded-md shadow-sm relative">
                     <AlertTriangleIcon className="h-6 w-6"/>
                     <span className="font-medium">{error}</span>
                     <button onClick={() => setError(null)} className="ml-auto font-bold text-xl">&times;</button>
                 </div>
             )}
 
-            <main className="flex-grow flex flex-col md:flex-row-reverse overflow-hidden relative pb-16 md:pb-0">
-                <div className={`w-full h-full md:w-2/3 md:relative ${activeTab === 'map' || isAddingStop ? 'block' : 'hidden'} md:block`}>
+            <main className="flex-grow flex flex-col md:flex-row overflow-hidden relative pb-16 md:pb-0">
+                <div className={`w-full h-full md:w-2/3 md:relative ${activeTab === 'map' || isAddingStop || isMobileSearchVisible ? 'block' : 'hidden'} md:block`}>
                      <MapWrapper 
                         itinerary={itinerary} 
                         onMarkerClick={handleMarkerClick}
                         selectedItemId={selectedItemId}
                         activeTab={activeTab}
-                        searchResults={isAddingStop ? searchResults : []}
-                        selectedSearchResultId={selectedSearchResult?.id ?? null}
+                        searchResults={searchResults}
+                        selectedSearchResultId={selectedPlaceFromMap?.id ?? null}
                         onSearchResultMarkerClick={(resultId) => {
                             const result = searchResults.find(r => r.id === resultId);
                             if (result) {
-                                handleSearchResultSelect(result);
+                                handleSelectionChange(result);
                             }
                         }}
+                        onViewboxChange={setMapViewbox}
                     />
                 </div>
-
-                <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'map' || isAddingStop ? 'hidden' : 'block'} md:block`}>
-                    {activeTab === 'search' && !isAddingStop && (
-                        <div className="flex md:hidden h-full flex-col items-center justify-center p-6 text-center">
-                            <div className="w-full max-w-sm flex flex-col items-stretch gap-4">
-                                <h2 className="text-2xl font-bold text-gray-800 mb-2">Let's plan your day!</h2>
-                                <AutocompleteInput value={city} onChange={(e) => { setCity(e.target.value); if (!e.target.value) setCityBounds(null); }} onSelect={({ name, boundingbox }) => { const cityName = name.split(',')[0].trim(); setCity(cityName); if (boundingbox) setCityBounds(boundingbox); }} placeholder="Enter a city..." className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition" onKeyDown={(e) => e.key === 'Enter' && handlePlanDay()} />
-                                <AutocompleteInput value={lodgingInput} onChange={(e) => { setLodgingInput(e.target.value); if (!e.target.value) setLodging(null); }} onSelect={({ name, lat, lng }) => { setLodging({ name, lat, lng }); setLodgingInput(name); }} viewbox={cityBounds} placeholder="Enter your hotel (optional)..." className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition" />
-                                {lodging && (<div className="flex items-center justify-center gap-2 text-sm text-gray-700 bg-gray-100 px-3 py-1 rounded-full"><span>📍 Starting from: <strong>{lodging.name}</strong></span><button onClick={handleClearLodging} className="font-mono text-red-500 hover:text-red-700 text-lg leading-none" aria-label="Clear lodging">&times;</button></div>)}
-                                <button onClick={handlePlanDay} disabled={isLoading} className="w-full mt-2 px-6 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 disabled:bg-blue-300 transition-colors flex items-center justify-center gap-2">{isLoading ? 'Planning...' : 'Plan Trip'}</button>
-                            </div>
+                
+                 <div className={`
+                    absolute top-0 left-0 right-0 bottom-0 md:static
+                    md:w-1/3 md:h-full
+                    bg-white shadow-lg md:overflow-y-auto 
+                    ${activeTab === 'itinerary' && !isAddingStop ? 'block' : 'hidden'} 
+                    md:block
+                `}>
+                    {isLoading && (
+                        <div className="flex justify-center items-center h-full flex-col gap-4 p-4 text-center">
+                            <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
+                            <p className="text-gray-600 font-semibold text-lg">{`Generating your amazing trip to ${city}...`}</p>
+                            <p className="text-gray-500">Our AI is finding the best spots and planning the perfect route. This might take a moment.</p>
                         </div>
                     )}
-                    
-                    <div className={`${activeTab === 'itinerary' ? 'block' : 'hidden'} md:block h-full`}>
-                        {isLoading && (
-                            <div className="flex justify-center items-center h-full flex-col gap-4 p-4 text-center">
-                                <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600"></div>
-                                <p className="text-gray-600 font-semibold text-lg">{`Generating your amazing trip to ${city}...`}</p>
-                                <p className="text-gray-500">Our AI is finding the best spots and planning the perfect route. This might take a moment.</p>
-                            </div>
-                        )}
 
-                        {!isLoading && itinerary.length > 0 && (
-                            <ItineraryPlanner
-                                itinerary={itinerary} setItinerary={setItineraryAndMarkModified}
-                                tripName={tripName} setTripName={setTripNameAndMarkModified}
-                                onSave={handleSaveTrip} selectedItemId={selectedItemId}
-                                onSuggestAlternative={handleSuggestAlternative} replacingItemId={replacingItemId}
-                                onMarkAsVisited={handleMarkAsVisited} city={city}
-                                completedActivities={completedActivities} showSaveButton={showSaveButton}
-                                onAddStop={handleStartAddStop}
-                            />
-                        )}
-                        
-                        {!isLoading && itinerary.length === 0 && (
-                             <div className="flex justify-center items-center h-full flex-col gap-4 p-8 text-center">
-                                <ListIcon className="h-24 w-24 text-gray-300" />
-                                <h2 className="text-2xl font-bold text-gray-700">Your adventure awaits!</h2>
-                                <p className="text-gray-500">Enter a city above and let our AI craft a personalized day trip for you. Your itinerary will appear here.</p>
-                            </div>
-                        )}
-                    </div>
+                    {!isLoading && itinerary.length > 0 && (
+                        <ItineraryPlanner
+                            itinerary={itinerary} setItinerary={setItineraryAndMarkModified}
+                            tripName={tripName} setTripName={setTripNameAndMarkModified}
+                            onSave={handleSaveTrip} selectedItemId={selectedItemId}
+                            onSuggestAlternative={handleSuggestAlternative} replacingItemId={replacingItemId}
+                            onMarkAsVisited={handleMarkAsVisited} city={city}
+                            completedActivities={completedActivities} showSaveButton={showSaveButton}
+                            onAddStop={handleStartAddStop}
+                        />
+                    )}
+                    
+                    {!isLoading && itinerary.length === 0 && activeTab === 'itinerary' && (
+                         <div className="flex justify-center items-center h-full flex-col gap-4 p-8 text-center">
+                            <ListIcon className="h-24 w-24 text-gray-300" />
+                            <h2 className="text-2xl font-bold text-gray-700">Your adventure awaits!</h2>
+                            <p className="text-gray-500">Switch to the 'Search' tab to plan a new trip. Your itinerary will appear here.</p>
+                        </div>
+                    )}
                 </div>
 
-                {isAddingStop && (
-                    <AddStopPanel
+                {isMobileSearchVisible && (
+                     <div className="md:hidden absolute bottom-16 left-0 right-0 z-20 p-4 bg-white/90 backdrop-blur-sm rounded-t-2xl shadow-lg">
+                        <div className="w-full max-w-sm mx-auto flex flex-col items-stretch gap-4">
+                            <h2 className="text-2xl font-bold text-gray-800 mb-2 text-center">Let's plan your day!</h2>
+                            <AutocompleteInput 
+                                value={city} 
+                                onChange={(e) => { setCity(e.target.value); if (!e.target.value) setCityBounds(null); }} 
+                                onSelect={({ name, boundingbox }) => { 
+                                    const cityName = name.split(',')[0].trim(); 
+                                    setCity(cityName); 
+                                    if (boundingbox) {
+                                        setCityBounds(boundingbox as [string, string, string, string]);
+                                        setMapViewbox(boundingbox as [string, string, string, string]);
+                                    }
+                                }} 
+                                placeholder="Enter a city..." 
+                                className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition" 
+                                onKeyDown={(e) => e.key === 'Enter' && handlePlanDay()} 
+                            />
+                            <AutocompleteInput 
+                                value={lodgingInput} 
+                                onChange={(e) => { setLodgingInput(e.target.value); if (!e.target.value) setLodging(null); }} 
+                                onSelect={({ name, lat, lng }) => { setLodging({ name, lat, lng }); setLodgingInput(name); }} 
+                                searchBounds={cityBounds}
+                                placeholder="Enter your hotel (optional)..." 
+                                className="w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 transition" 
+                            />
+                            <button onClick={handlePlanDay} disabled={isLoading} className="w-full mt-2 px-6 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 disabled:bg-blue-300 transition-colors flex items-center justify-center gap-2">{isLoading ? 'Planning...' : 'Plan Trip'}</button>
+                        </div>
+                    </div>
+                )}
+                 
+                 {isAddingStop && (
+                     <AddStopPanel
                         onSave={handleAddItem}
                         onCancel={handleCancelAddStop}
-                        onSearchResultsChange={setSearchResults}
-                        onSearchResultSelect={handleSearchResultSelect}
-                        cityBounds={cityBounds}
-                        selectedSearchResult={selectedSearchResult}
-                        onClearSelection={handleClearSelectedSearchResult}
+                        onSearchResultsChange={handleSearchForStops}
+                        onSelectionChange={handleSelectionChange}
+                        searchBounds={mapViewbox ?? cityBounds}
+                        selectedPlaceFromMap={selectedPlaceFromMap}
+                        isSaving={isAddingItem}
+                        cityContext={city}
                     />
                 )}
             </main>
