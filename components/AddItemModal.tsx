@@ -8,12 +8,13 @@ interface AddStopPanelProps {
     onCancel: () => void;
     onSearchResultsChange: (results: SearchResult[]) => void;
     onSearchResultSelect: (result: SearchResult) => void;
-    cityBounds: [string, string, string, string] | null;
+    searchBounds: [string, string, string, string] | null;
     selectedSearchResult: SearchResult | null;
     onClearSelection: () => void;
+    cityContext: string;
 }
 
-const AddStopPanel: React.FC<AddStopPanelProps> = ({ onSave, onCancel, onSearchResultsChange, onSearchResultSelect, cityBounds, selectedSearchResult, onClearSelection }) => {
+const AddStopPanel: React.FC<AddStopPanelProps> = ({ onSave, onCancel, onSearchResultsChange, onSearchResultSelect, searchBounds, selectedSearchResult, onClearSelection, cityContext }) => {
     const [name, setName] = useState('');
     const [time, setTime] = useState('');
     const [description, setDescription] = useState('');
@@ -73,7 +74,8 @@ const AddStopPanel: React.FC<AddStopPanelProps> = ({ onSave, onCancel, onSearchR
                                 onSearchResultSelect(result);
                             }}
                             onResultsChange={onSearchResultsChange}
-                            viewbox={cityBounds}
+                            viewbox={searchBounds}
+                            cityContext={cityContext}
                             placeholder="Search for a place..."
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                             required
@@ -86,7 +88,7 @@ const AddStopPanel: React.FC<AddStopPanelProps> = ({ onSave, onCancel, onSearchR
                             type="text" id="time" value={time}
                             onChange={(e) => setTime(e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            placeholder="e.g., 2:00 PM" required
+                            placeholder="e.g., 14:30" required
                         />
                     </div>
 

@@ -33,6 +33,7 @@ const App: React.FC = () => {
     const [isAddingStop, setIsAddingStop] = useState<boolean>(false);
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [selectedSearchResult, setSelectedSearchResult] = useState<SearchResult | null>(null);
+    const [mapViewbox, setMapViewbox] = useState<[string, string, string, string] | null>(null);
 
 
     useEffect(() => {
@@ -261,7 +262,29 @@ const App: React.FC = () => {
             ...newItemData,
             id: `${Date.now()}-manual`,
         };
-        setItinerary(prev => [...prev, newItem]);
+    
+        const newItinerary = [...itinerary];
+    
+        // Helper function to convert "HH:MM" to a comparable number.
+        const parseTime = (timeStr: string): number => {
+            if (!timeStr || typeof timeStr !== 'string') return 9999;
+            const cleaned = timeStr.replace(/[^0-9]/g, '');
+            // Pad with leading zero if necessary (e.g., "900" becomes "0900")
+            return parseInt(cleaned.padStart(4, '0'), 10);
+        };
+    
+        const newItemTime = parseTime(newItem.time);
+    
+        // Find the correct index to insert the new item to maintain chronological order.
+        const insertionIndex = newItinerary.findIndex(item => parseTime(item.time) > newItemTime);
+    
+        if (insertionIndex === -1) {
+            newItinerary.push(newItem); // Add to end if it's the latest time.
+        } else {
+            newItinerary.splice(insertionIndex, 0, newItem);
+        }
+    
+        setItinerary(newItinerary);
         if (currentTripId) setIsModified(true);
         handleCancelAddStop();
     };
@@ -354,6 +377,7 @@ const App: React.FC = () => {
                                 handleSearchResultSelect(result);
                             }
                         }}
+                        onViewboxChange={setMapViewbox}
                     />
                 </div>
                 <div className={`w-full md:w-1/3 h-full bg-white shadow-lg overflow-y-auto ${activeTab === 'map' ? 'hidden' : 'block'} md:block`}>
@@ -384,9 +408,10 @@ const App: React.FC = () => {
                                 onCancel={handleCancelAddStop}
                                 onSearchResultsChange={setSearchResults}
                                 onSearchResultSelect={handleSearchResultSelect}
-                                cityBounds={cityBounds}
+                                searchBounds={mapViewbox}
                                 selectedSearchResult={selectedSearchResult}
                                 onClearSelection={handleClearSelectedSearchResult}
+                                cityContext={city}
                             />
                         )}
 
