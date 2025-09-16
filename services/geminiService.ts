@@ -32,6 +32,7 @@ const itinerarySchema = {
                         enum: ['activity', 'landmark', 'restaurant', 'lodging', 'other']
                     },
                     travelTime: { type: Type.STRING, description: "Estimated travel time from the previous location, e.g., 'approx. 15 mins'." },
+                    imageUrl: { type: Type.STRING, description: "A publicly accessible URL to a high-quality, royalty-free photograph of the location." },
                 },
                 required: ["name", "description", "time", "lat", "lng", "transport", "category"],
             },
@@ -59,6 +60,7 @@ const singleItemSchema = {
             enum: ['activity', 'landmark', 'restaurant', 'other']
         },
         travelTime: { type: Type.STRING, description: "Estimated travel time from the previous location, e.g., 'approx. 10 mins'." },
+        imageUrl: { type: Type.STRING, description: "A publicly accessible URL to a high-quality, royalty-free photograph of the location." },
     },
     required: ["name", "description", "time", "lat", "lng", "transport", "category", "travelTime"],
 };
@@ -70,6 +72,7 @@ const placeDetailsSchema = {
         description: { type: Type.STRING, description: "A brief, one-sentence description of the place." },
         lat: { type: Type.NUMBER, description: "The precise latitude of the place." },
         lng: { type: Type.NUMBER, description: "The precise longitude of the place." },
+        imageUrl: { type: Type.STRING, description: "A publicly accessible URL to a high-quality, royalty-free photograph of the location." },
     },
     required: ["name", "description", "lat", "lng"],
 };
@@ -82,18 +85,21 @@ export const generateItinerary = async (city: string, lodging?: { name: string; 
         const exclusionPrompt = completedActivities.length > 0 
             ? `\nCrucially, do NOT include any of the following places in the itinerary as the user has already visited them: ${completedActivities.join(', ')}.`
             : '';
+        
+        const baseInstructions = "For all items (lodging, activities, and restaurants), provide a name, a brief one-sentence description, precise latitude and longitude, a suggested time, the best mode of transport from the previous location (from 'walk', 'metro', 'bus', 'taxi', 'car'), a category (from 'activity', 'landmark', 'restaurant', 'lodging', 'other'), an estimated travelTime (e.g., 'approx. 15 mins') from the previous location, and a publicly accessible `imageUrl` to a high-quality, royalty-free photograph of the location. For the first item, travelTime can be null. Ensure the restaurants are categorized as 'restaurant'.";
+
 
         if (lodging) {
             prompt = `Generate a realistic and engaging one-day travel itinerary for ${city}, creating a complete round trip that starts and ends at the user's lodging: "${lodging.name}". The plan should include popular and interesting locations or activities, logically ordered for a full day.
 It is mandatory to include a stop for lunch at a restaurant around 12:00 PM (noon) and another stop for dinner at a restaurant around 8:00 PM (20:00).
 The very first item in the itinerary must be "${lodging.name}" at latitude ${lodging.lat} and longitude ${lodging.lng}. Its transport mode must be 'start' and its category must be 'lodging'.
 The very last item in the itinerary must also be a return to the lodging, "${lodging.name}", at the same coordinates. The description for this last item should be something like "Return to lodging." and its category must be 'lodging'.
-For all items (lodging, activities, and restaurants), provide a name, a brief one-sentence description, precise latitude and longitude, a suggested time, the best mode of transport from the previous location (from 'walk', 'metro', 'bus', 'taxi', 'car'), a category (from 'activity', 'landmark', 'restaurant', 'lodging', 'other'), and an estimated travelTime (e.g., "approx. 15 mins") from the previous location. For the first item, travelTime can be null. Ensure the restaurants are categorized as 'restaurant'.`;
+${baseInstructions}`;
         } else {
             prompt = `Generate a realistic and engaging one-day travel itinerary for ${city}. The plan should include popular and interesting locations or activities, logically ordered for a full day starting around 9 AM.
 It is mandatory to include a stop for lunch at a restaurant around 12:00 PM (noon) and another stop for dinner at a restaurant around 8:00 PM (20:00).
-For all items (activities and restaurants), provide a name, a brief description, precise latitude and longitude, a suggested time, the best mode of transport from the previous location (from 'walk', 'metro', 'bus', 'taxi', 'car'), a category (from 'activity', 'landmark', 'restaurant', 'other'), and an estimated travelTime (e.g., "approx. 15 mins") from the previous location.
-The very first location's transport mode must be 'start' and its travelTime can be null. Ensure the restaurants are categorized as 'restaurant'.`;
+The very first location's transport mode must be 'start'.
+${baseInstructions}`;
         }
 
         prompt += exclusionPrompt;
@@ -147,7 +153,7 @@ The new suggestion should:
 3. NOT be any of the following places the user has already visited in this city: ${completedActivities.join(', ') || 'None'}.
 4. Must be a different place than the original ("${itemToReplace.name}").
 
-Provide a response with a new name, a brief one-sentence description, precise latitude and longitude, a suggested time (close to the original), the best mode of transport from the previous location, a category (activity, landmark, restaurant, or other), and an estimated travel time from the previous location. The entire day's itinerary is provided for context of the day's flow: ${JSON.stringify(fullItinerary.map(i => ({name: i.name, time: i.time})))}.`;
+Provide a response with a new name, a brief one-sentence description, precise latitude and longitude, a suggested time (close to the original), the best mode of transport from the previous location, a category (activity, landmark, restaurant, or other), an estimated travel time from the previous location, and a publicly accessible imageUrl for a high-quality, royalty-free photograph. The entire day's itinerary is provided for context of the day's flow: ${JSON.stringify(fullItinerary.map(i => ({name: i.name, time: i.time})))}.`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
@@ -174,9 +180,9 @@ Provide a response with a new name, a brief one-sentence description, precise la
     }
 };
 
-export const getPlaceDetails = async (placeName: string, city: string): Promise<Pick<ItineraryItem, 'name' | 'description' | 'lat' | 'lng'>> => {
+export const getPlaceDetails = async (placeName: string, city: string): Promise<Pick<ItineraryItem, 'name' | 'description' | 'lat' | 'lng' | 'imageUrl'>> => {
     try {
-        const prompt = `Provide the name, a brief one-sentence description, and precise latitude and longitude for the following location in ${city}: "${placeName}".`;
+        const prompt = `Provide the name, a brief one-sentence description, precise latitude and longitude, and a publicly accessible imageUrl for a high-quality, royalty-free photograph for the following location in ${city}: "${placeName}".`;
 
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",

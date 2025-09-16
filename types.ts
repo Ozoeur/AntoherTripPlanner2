@@ -10,6 +10,7 @@ export interface ItineraryItem {
     transport: 'walk' | 'metro' | 'bus' | 'taxi' | 'start' | 'car';
     category: 'activity' | 'landmark' | 'restaurant' | 'lodging' | 'other';
     travelTime?: string;
+    imageUrl?: string;
 }
 
 export interface TripPlan {

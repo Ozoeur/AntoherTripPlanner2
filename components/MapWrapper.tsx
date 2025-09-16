@@ -6,6 +6,8 @@ interface MapWrapperProps {
     itinerary: ItineraryItem[];
     onMarkerClick: (itemId: string | null) => void;
     selectedItemId: string | null;
+    // FIX: Add 'search' to the activeTab type to match the state in App.tsx
+    activeTab: 'itinerary' | 'map' | 'search';
 }
 
 // Function to get polyline color based on transport mode
@@ -49,7 +51,7 @@ const getCategoryIconSvg = (category: ItineraryItem['category']): string => {
     }
 };
 
-const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selectedItemId }) => {
+const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selectedItemId, activeTab }) => {
     const mapRef = useRef<HTMLDivElement>(null);
     const mapInstance = useRef<L.Map | null>(null);
     const layerGroup = useRef<L.LayerGroup | null>(null);
@@ -115,7 +117,17 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selec
                     zIndexOffset: isSelected ? 1000 : 0
                 }).addTo(layerGroup.current!);
 
-                marker.bindPopup(`<b>${item.name}</b><br>${item.description}`);
+                const popupContent = `
+                    <div class="map-popup">
+                        ${item.imageUrl ? `<img src="${item.imageUrl}" alt="${item.name}" class="popup-image">` : ''}
+                        <div class="popup-content">
+                            <h3 class="popup-title">${item.name}</h3>
+                            <p class="popup-description">${item.description}</p>
+                        </div>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+
                 marker.on('click', () => {
                     onMarkerClick(isSelected ? null : item.id);
                 });
@@ -139,8 +151,8 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selec
                 polyline.addTo(layerGroup.current);
             }
 
-            // Fit map to bounds
-            if (markers.length > 0) {
+            // Fit map to bounds, but only if the map tab is active to avoid issues
+            if (markers.length > 0 && activeTab === 'map') {
                 const featureGroup = L.featureGroup(markers);
                 mapInstance.current.fitBounds(featureGroup.getBounds(), { padding: [50, 50] });
             }
@@ -150,7 +162,34 @@ const MapWrapper: React.FC<MapWrapperProps> = ({ itinerary, onMarkerClick, selec
             mapInstance.current.setView([48.8566, 2.3522], 12);
         }
 
-    }, [itinerary, selectedItemId, onMarkerClick]);
+    }, [itinerary, selectedItemId, onMarkerClick, activeTab]);
+
+    // Invalidate map size on tab switch to fix rendering issues
+    useEffect(() => {
+        const map = mapInstance.current;
+        if (map && activeTab === 'map') {
+            // Use a small timeout to ensure the map container is visible and has its final dimensions.
+            setTimeout(() => {
+                map.invalidateSize();
+                
+                // Re-fit the bounds to the markers when the map becomes visible
+                if (itinerary.length > 0) {
+                    const markers: L.Marker[] = [];
+                    if (layerGroup.current) {
+                        layerGroup.current.eachLayer(layer => {
+                            if (layer instanceof L.Marker) {
+                                markers.push(layer);
+                            }
+                        });
+                    }
+                    if (markers.length > 0) {
+                        const featureGroup = L.featureGroup(markers);
+                        map.fitBounds(featureGroup.getBounds(), { padding: [50, 50] });
+                    }
+                }
+            }, 100);
+        }
+    }, [activeTab, itinerary]);
 
     return <div ref={mapRef} className="h-full w-full z-10" />;
 };

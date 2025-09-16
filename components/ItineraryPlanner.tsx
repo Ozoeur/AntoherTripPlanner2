@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ItineraryItem } from '../types';
-import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon } from './Icons';
+import { SaveIcon, GripVerticalIcon, WalkIcon, SubwayIcon, BusIcon, CarIcon, StartIcon, EditIcon, TrashIcon, PlusCircleIcon, ClockIcon, RestaurantIcon, LandmarkIcon, ActivityIcon, BedIcon, ShuffleIcon, CheckCircleIcon } from './Icons';
 import EditItemModal from './EditItemModal';
 import AddItemModal from './AddItemModal';
 
@@ -13,6 +13,9 @@ interface ItineraryPlannerProps {
     selectedItemId: string | null;
     onSuggestAlternative: (itemId: string) => void;
     replacingItemId: string | null;
+    onMarkAsVisited: (item: ItineraryItem) => void;
+    city: string;
+    completedActivities: { [city: string]: string[] };
 }
 
 const TransportIcon = ({ transport }: { transport: ItineraryItem['transport'] }) => {
@@ -38,7 +41,7 @@ const CategoryIcon = ({ category }: { category: ItineraryItem['category'] }) => 
     }
 };
 
-const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItinerary, tripName, setTripName, onSave, selectedItemId, onSuggestAlternative, replacingItemId }) => {
+const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItinerary, tripName, setTripName, onSave, selectedItemId, onSuggestAlternative, replacingItemId, onMarkAsVisited, city, completedActivities }) => {
     const [draggedItemId, setDraggedItemId] = useState<string | null>(null);
     const [editingItem, setEditingItem] = useState<ItineraryItem | null>(null);
     const [isAdding, setIsAdding] = useState(false);
@@ -111,19 +114,19 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
     return (
         <>
             <div className="p-4 h-full flex flex-col">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center gap-3 mb-4">
                      <input 
                         type="text" 
                         value={tripName} 
                         onChange={(e) => setTripName(e.target.value)}
-                        className="text-2xl font-bold text-gray-800 bg-transparent border-b-2 border-transparent focus:border-blue-500 outline-none w-2/3"
+                        className="text-xl md:text-2xl font-bold text-gray-800 bg-transparent border-b-2 border-transparent focus:border-blue-500 outline-none flex-grow min-w-0"
                     />
                     <button
                         onClick={onSave}
-                        className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors"
+                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-green-500 text-white rounded-full font-semibold hover:bg-green-600 transition-colors text-sm"
                     >
                         <SaveIcon className="h-5 w-5" />
-                        Save Trip
+                        Save
                     </button>
                 </div>
                 <div className="flex-grow overflow-y-auto pr-2">
@@ -134,12 +137,13 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                         {itinerary.map((item, index) => {
                             const isReplacing = replacingItemId === item.id;
                             const isLodgingStartEnd = item.category === 'lodging' && (index === 0 || index === itinerary.length - 1);
+                            const isVisited = city && completedActivities[city]?.includes(item.name);
 
                             return (
                             <React.Fragment key={item.id}>
                                 <div
                                     ref={el => { itemRefs.current[item.id] = el; }}
-                                    className={`flex items-start mb-4 relative pl-10 transition-all duration-300 rounded-lg ${selectedItemId === item.id ? 'bg-blue-50 ring-2 ring-blue-500' : ''} ${isReplacing ? 'opacity-60' : ''}`}
+                                    className={`flex items-start mb-4 relative pl-10 transition-all duration-300 rounded-lg ${selectedItemId === item.id ? 'bg-blue-50 ring-2 ring-blue-500' : ''} ${isReplacing ? 'opacity-60' : ''} ${isVisited ? 'opacity-70' : ''}`}
                                     draggable={!isReplacing}
                                     onDragStart={(e) => !isReplacing && handleDragStart(e, item.id)}
                                     onDragOver={handleDragOver}
@@ -158,6 +162,17 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                                             </div>
                                         )}
                                         <div className="absolute top-2 right-2 flex gap-1">
+                                            {!isLodgingStartEnd && (
+                                                 <button
+                                                    onClick={() => onMarkAsVisited(item)}
+                                                    className={`p-1.5 rounded-full transition-colors ${isVisited ? 'text-green-500' : 'text-gray-500 hover:bg-gray-200'}`}
+                                                    aria-label={isVisited ? "Marked as visited" : "Mark as visited"}
+                                                    disabled={isVisited}
+                                                    title={isVisited ? "Already visited" : "Mark as visited"}
+                                                >
+                                                    <CheckCircleIcon className="h-4 w-4" />
+                                                </button>
+                                            )}
                                             {!isLodgingStartEnd && (
                                                 <button 
                                                     onClick={() => onSuggestAlternative(item.id)}
@@ -186,9 +201,9 @@ const ItineraryPlanner: React.FC<ItineraryPlannerProps> = ({ itinerary, setItine
                                                 </button>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-3 pr-16">
+                                        <div className="flex items-center gap-3 pr-24">
                                             <CategoryIcon category={item.category} />
-                                            <h3 className="font-bold text-lg text-gray-800">{item.name}</h3>
+                                            <h3 className={`font-bold text-lg text-gray-800 ${isVisited ? 'line-through' : ''}`}>{item.name}</h3>
                                         </div>
                                         <p className="text-sm text-gray-500 mb-2">{item.time}</p>
                                         <p className="text-gray-600 mb-3">{item.description}</p>

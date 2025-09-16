@@ -1,9 +1,9 @@
 import React from 'react';
-import { ListIcon, MapIcon } from './Icons';
+import { ListIcon, MapIcon, SearchIcon } from './Icons';
 
 interface BottomNavBarProps {
-    activeTab: 'itinerary' | 'map';
-    setActiveTab: (tab: 'itinerary' | 'map') => void;
+    activeTab: 'search' | 'itinerary' | 'map';
+    setActiveTab: (tab: 'search' | 'itinerary' | 'map') => void;
 }
 
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, setActiveTab }) => {
@@ -13,6 +13,14 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, setActiveTab }) 
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white shadow-[0_-2px_5px_rgba(0,0,0,0.1)] flex md:hidden z-30">
+            <button
+                onClick={() => setActiveTab('search')}
+                className={`${commonButtonClasses} ${activeTab === 'search' ? activeClasses : inactiveClasses}`}
+                aria-pressed={activeTab === 'search'}
+            >
+                <SearchIcon className="h-6 w-6 mb-1" />
+                <span className="text-xs font-medium">Search</span>
+            </button>
             <button
                 onClick={() => setActiveTab('itinerary')}
                 className={`${commonButtonClasses} ${activeTab === 'itinerary' ? activeClasses : inactiveClasses}`}
