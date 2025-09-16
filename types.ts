@@ -1,5 +1,4 @@
 
-
 export interface ItineraryItem {
     id: string;
     name: string;
@@ -25,6 +24,4 @@ export interface SearchResult {
   name: string;
   lat: number;
   lng: number;
-  // FIX: Add optional boundingbox to support city selection with bounds
-  boundingbox?: [string, string, string, string];
 }
