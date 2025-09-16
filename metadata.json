@@ -1,0 +1,5 @@
+{
+  "name": "Another Trip Planner",
+  "description": "A responsive, mobile-first application to plan your day trips. It uses a Open Street map  to visualize routes between different locations and activities, with itineraries automatically generated based on your destination city. You can modify, reorder, and save your daily travel plans.",
+  "requestFramePermissions": []
+}
